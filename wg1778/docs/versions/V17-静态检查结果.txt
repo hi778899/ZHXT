@@ -1,0 +1,9 @@
+V17 静态检查结果
+日期：2026-09-11
+
+1. TS/TSX 语法转译检查：20 个实现文件，0 个语法错误。
+2. 服务端 TypeScript 严格类型检查：通过（tsc -p server/tsconfig.json --noEmit；检查环境使用本地类型声明，不写入交付包）。
+3. Shell 脚本语法检查：start-production.sh / stop-production.sh / 启动生产环境.sh 通过。
+4. V17 新增模型模板及迁移中的 501... 数字化编码/标识静态检查：均为 16 位。
+5. package.json JSON 解析：通过。
+6. 当前执行环境无法连接 npm registry，因此未在本机重新下载依赖执行 pnpm build:all；生产环境首次构建请使用 docker compose up -d --build 完成最终依赖与构建验证。

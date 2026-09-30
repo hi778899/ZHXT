@@ -1,0 +1,8 @@
+V17.1.2.4 静态检查结果
+
+1. server/src/data-linkage.ts 修改段已使用 TypeScript 5.8.3 strict 最小语义检查：PASS。
+2. server/src/data-linkage.ts 使用 TypeScript transpileModule 语法转译检查：PASS。
+3. 新增迁移：server/migrations/017_repair_legacy_leave_days.sql。
+4. 017 仅在请休假模型缺少 days 计算元数据时补齐，不覆盖已存在同名计算；按历史开始/结束日期回填 5013001005001106。
+5. 保留 014/015/016 与 V17.1.2.3 的全部修复。
+6. 当前环境 npm registry 不可达，因此未在本环境执行完整 pnpm run build:all；生产 Docker 构建仍应执行完整 TypeScript 编译。

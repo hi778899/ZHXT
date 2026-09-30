@@ -1,0 +1,10 @@
+V17.1 静态检查结果
+
+1. src/App.tsx 已使用全局 TypeScript 5.8.3 进行语法解析检查；未发现 TS1005/TS1109/TS1128/TS17008 等语法/JSX 结构错误。
+2. 当前执行环境未安装项目依赖，且无法访问 npm registry，因此未执行完整 vite build / server build。
+3. 014_model_backed_standard_libraries.sql 已检查并修复 PostgreSQL 42702：
+   - types.name -> types.type_name
+   - attrs.name -> attrs.attr_name
+   - attrs.description -> attrs.attr_description
+4. 数字化库普通数据表头不再展示16位数字化标识；字段设计与记录详情保留标识展示。
+5. 旧 digital_library_records 若 identifier_values 缺失，前端会回退读取 data 中同名中文字段，避免历史记录整列显示“—”。
