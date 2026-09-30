@@ -760,13 +760,15 @@ function approvalNodeRuntimeConfig(rows: StandardRecord[], candidates: string[],
     return {item,score:(configuredType ? 2 : 0)+(configuredLevel ? 4 : 0)}
   }).sort((a,b)=>b.score-a.score)
   const selected=scored[0]?.item
-  const timeoutHours=Number(selected?.values?.["5013001001110171"] ?? NaN)
+  const timeoutRaw=selected?.values?.["5013001001110171"] ?? recordDataText(selected,"模型时限","timeoutHours")
+  const timeoutHours=Number(timeoutRaw ?? NaN)
   return {
     timeoutHours:Number.isFinite(timeoutHours) && timeoutHours>0 ? timeoutHours : 0,
+    timeoutValue:String(timeoutRaw ?? "").trim(),
     requirement:recordDataText(selected,"办理要求","审批内容","审查内容","requirement") || fallbackRequirement,
     reminderRule:recordDataText(selected,"提醒规则","时限提醒规则","reminderRule"),
     outputField:recordDataText(selected,"输出字段","outputField") || (nodeType.includes("审查") ? "审查意见" : "审批意见"),
-    evidence:{nodeType,levelOrPosition,matchedBusiness:candidates,rule:selected ? "节点类型 + 审批层级/岗位匹配模型时限数字化库" : "未匹配专属节点时限，使用业务范围默认配置"},
+    evidence:{nodeType,levelOrPosition,matchedBusiness:candidates,rule:selected ? "节点类型 + 审批层级/岗位匹配模型时限数字化库" : "未匹配专属节点时限，使用业务范围默认配置",timeoutLibraryId:"lib-standard-model-timeout",timeoutValue:String(timeoutRaw ?? "").trim()},
   }
 }
 function departmentPath(departmentRows: StandardRecord[], startDepartment: string) {
@@ -906,7 +908,7 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
     steps.push({
       id:`digital-administrative-${steps.length+1}`,title:`行政审批 · ${organizationName}${organizationRank ? ` · ${organizationRank}` : ""}`,
       approvalType:"administrative",assigneeScope:"named_user",userName,roleLabel:userName,departmentField:"department",organizationName,organizationRank,
-      requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,
+      requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,
       evidence:{organizationName,organizationRank,baseTarget:baseAdministrativeTarget,adjustedTarget:administrativeLevel,organizationRule:"进入新的组织后按该组织数字化属性重新匹配审批人",nodeConfig:nodeConfig.evidence},
     })
     if (adminRank && organizationRank === adminRank) break
@@ -914,16 +916,16 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
   if (!steps.length && (admin || adminAssignment || administrativeLevel)) {
     const fallbackStep=fallbackByType(["administrative"],0)
     const nodeConfig=approvalNodeRuntimeConfig(timeoutRules,candidates,"行政审批",adminRank || administrativeLevel,administrativeRequirement)
-    if (adminUser) steps.push({id:"digital-administrative-1",title:`行政审批${administrativeLevel ? ` · ${administrativeLevel}` : ""}`,approvalType:"administrative",assigneeScope:"named_user",userName:adminUser,roleLabel:adminUser,departmentField:"department",organizationName:startDepartment,organizationRank:adminRank,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationName:startDepartment,organizationRank:adminRank,baseTarget:baseAdministrativeTarget,adjustedTarget:administrativeLevel,rule:"审批分管配置数字化库匹配",nodeConfig:nodeConfig.evidence}})
-    else if (fallbackStep) steps.push({...fallbackStep,id:"digital-administrative-1",title:`行政审批${administrativeLevel ? ` · ${administrativeLevel}` : ""}`,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationName:startDepartment,baseTarget:baseAdministrativeTarget,adjustedTarget:administrativeLevel,rule:"审批配置兼容路径",nodeConfig:nodeConfig.evidence}})
+    if (adminUser) steps.push({id:"digital-administrative-1",title:`行政审批${administrativeLevel ? ` · ${administrativeLevel}` : ""}`,approvalType:"administrative",assigneeScope:"named_user",userName:adminUser,roleLabel:adminUser,departmentField:"department",organizationName:startDepartment,organizationRank:adminRank,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationName:startDepartment,organizationRank:adminRank,baseTarget:baseAdministrativeTarget,adjustedTarget:administrativeLevel,rule:"审批分管配置数字化库匹配",nodeConfig:nodeConfig.evidence}})
+    else if (fallbackStep) steps.push({...fallbackStep,id:"digital-administrative-1",title:`行政审批${administrativeLevel ? ` · ${administrativeLevel}` : ""}`,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationName:startDepartment,baseTarget:baseAdministrativeTarget,adjustedTarget:administrativeLevel,rule:"审批配置兼容路径",nodeConfig:nodeConfig.evidence}})
   }
   if (business || technicalAssignment || technicalLevel) {
     const fallbackStep=fallbackByType(["technical","business"],1)
     const nodeConfig=approvalNodeRuntimeConfig(timeoutRules,candidates,"技术/业务审查",technicalRank || technicalLevel,technicalRequirement)
-    if (technicalUser) steps.push({id:`digital-technical-${steps.length+1}`,title:`技术/业务审查${technicalLevel ? ` · ${technicalLevel}` : ""}`,approvalType:"technical",assigneeScope:"named_user",userName:technicalUser,roleLabel:technicalUser,departmentField:"department",organizationRank:technicalRank,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationRank:technicalRank,baseTarget:baseTechnicalTarget,adjustedTarget:technicalLevel,rule:"业务审批分管与岗位数字化库匹配",nodeConfig:nodeConfig.evidence}})
-    else if (fallbackStep) steps.push({...fallbackStep,id:`digital-technical-${steps.length+1}`,title:`技术/业务审查${technicalLevel ? ` · ${technicalLevel}` : ""}`,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationRank:technicalRank,baseTarget:baseTechnicalTarget,adjustedTarget:technicalLevel,rule:"业务审查配置兼容路径",nodeConfig:nodeConfig.evidence}})
+    if (technicalUser) steps.push({id:`digital-technical-${steps.length+1}`,title:`技术/业务审查${technicalLevel ? ` · ${technicalLevel}` : ""}`,approvalType:"technical",assigneeScope:"named_user",userName:technicalUser,roleLabel:technicalUser,departmentField:"department",organizationRank:technicalRank,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationRank:technicalRank,baseTarget:baseTechnicalTarget,adjustedTarget:technicalLevel,rule:"业务审批分管与岗位数字化库匹配",nodeConfig:nodeConfig.evidence}})
+    else if (fallbackStep) steps.push({...fallbackStep,id:`digital-technical-${steps.length+1}`,title:`技术/业务审查${technicalLevel ? ` · ${technicalLevel}` : ""}`,requirement:nodeConfig.requirement,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,outputField:nodeConfig.outputField,evidence:{organizationRank:technicalRank,baseTarget:baseTechnicalTarget,adjustedTarget:technicalLevel,rule:"业务审查配置兼容路径",nodeConfig:nodeConfig.evidence}})
   }
-  if (!steps.length) steps.push(...fallback.map((item,index)=>{ const nodeConfig=approvalNodeRuntimeConfig(timeoutRules,candidates,item.approvalType === "technical" ? "技术/业务审查" : "行政审批",item.organizationRank || item.roleLabel || item.title,item.requirement || "按审批模型数字化配置执行本环节审批/审查"); return {...item,id:`digital-fallback-${index+1}`,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,reminderRule:nodeConfig.reminderRule,requirement:nodeConfig.requirement,outputField:nodeConfig.outputField,evidence:{...plainObject(item.evidence),nodeConfig:nodeConfig.evidence}} }))
+  if (!steps.length) steps.push(...fallback.map((item,index)=>{ const nodeConfig=approvalNodeRuntimeConfig(timeoutRules,candidates,item.approvalType === "technical" ? "技术/业务审查" : "行政审批",item.organizationRank || item.roleLabel || item.title,item.requirement || "按审批模型数字化配置执行本环节审批/审查"); return {...item,id:`digital-fallback-${index+1}`,timeoutHours:nodeConfig.timeoutHours || defaultTimeoutHours,timeoutValue:nodeConfig.timeoutValue || (defaultTimeoutHours ? String(defaultTimeoutHours) : ""),reminderRule:nodeConfig.reminderRule,requirement:nodeConfig.requirement,outputField:nodeConfig.outputField,evidence:{...plainObject(item.evidence),nodeConfig:nodeConfig.evidence}} }))
 
   // 正式路径按“实际人员”去重，保留靠后的有效环节。
   const unique:ApprovalStepDefinition[]=[]; const seen=new Set<string>()
@@ -1098,12 +1100,10 @@ async function createApprovalTodo(row: ProjectRow, runId: string, ownerId: strin
   const timeoutHours = Number(currentDef?.timeoutHours ?? output.approvalTimeoutHours ?? 0)
   const dueAt = Number.isFinite(timeoutHours) && timeoutHours > 0 ? new Date(arrivedAt.getTime() + timeoutHours * 3600000) : null
   const businessContent=plainObject(output.approvalBusinessContent)
-  // 当前办理页的规定时限必须与本次审批运算快照一致。
-  // 审批人计算是本次正式路径逐节点计算结果，优先作为当前节点展示值；
-  // currentDef/output 仅用于兼容历史或未生成独立计算快照的数据。
-  const approverCalculation = asArray<Record<string,unknown>>(output["审批人计算"])
-  const computedTimeoutValue = String(approverCalculation[stepIndex]?.["规定时限"] ?? "").trim()
-  const currentTimeoutValue = computedTimeoutValue || String(currentDef?.timeoutValue ?? "").trim() || String(output["规定时限"] ?? "").trim()
+  // 当前办理页的“规定时限”必须来自模型时限数字化库。
+  // currentDef.timeoutValue 是本次审批路径计算时从模型时限数字化库匹配得到的当前节点正式值；
+  // 审批人计算和模型运行 output 只保留运算留痕，不再作为当前办理页的反向补值来源。
+  const currentTimeoutValue = String(currentDef?.timeoutValue ?? "").trim() || "未配置"
   const content = JSON.stringify({
     type: "approval_task_v3",
     sourceModelName: String(businessContent.sourceModelName ?? input.sourceModelName ?? "业务事项"),
@@ -1124,6 +1124,8 @@ async function createApprovalTodo(row: ProjectRow, runId: string, ownerId: strin
     approvalDueAt: dueAt?.toISOString() ?? "",
     approvalTimeoutHours: timeoutHours,
     currentTimeoutValue,
+    currentTimeoutSourceLibraryId:"lib-standard-model-timeout",
+    currentTimeoutSourceLibraryName:"模型时限数字化库",
     thresholdVariables: asArray<Record<string,unknown>>(output.approvalThresholdVariables),
     approvalComputationEvidence: plainObject(output.approvalComputationEvidence),
     "审批人计算": asArray<Record<string,unknown>>(output["审批人计算"]),
@@ -1333,8 +1335,9 @@ function libraryArchiveData(row: ProjectRow, runId: string, fileName: string, di
       "业务模型文件名":output["业务模型文件名"] ?? input["业务模型文件名"] ?? output.businessFileName ?? input.businessFileName ?? "",
       "业务中文显示名称":output["业务中文显示名称"] ?? input["业务中文显示名称"] ?? output.businessDisplayFileName ?? input.businessDisplayFileName ?? "",
       "业务数字化标识":output["业务数字化标识"] ?? input["业务数字化标识"] ?? output.businessDigitalId ?? input.businessDigitalId ?? "",
+      "来源审批模型运行记录":String(input.sourceRunId ?? ""),"来源审批模型文件名":String(input["前序模型文件名"] ?? input.sourceFileName ?? ""),
       "审批结果":output["审批结果"] ?? input["审批结果"] ?? input.approvalResult ?? plainObject(input.sourceOutput).approvalResult ?? "",
-      "统计分析状态":output["统计分析状态"] ?? "","待处理数字化标识集合":output["待处理数字化标识集合"] ?? [],"有关联数字化标识集合":output["有关联数字化标识集合"] ?? [],
+      "统计分析状态":output["统计分析状态"] ?? "","统计分析模型文件名":output["统计分析模型文件名"] ?? "","待处理数字化标识集合":output["待处理数字化标识集合"] ?? [],"有关联数字化标识集合":output["有关联数字化标识集合"] ?? [],
       "各数字化标识有效数据条数":output["各数字化标识有效数据条数"] ?? [],"特殊判断结果":output["特殊判断结果"] ?? "","正常关联判断结果":output["正常关联判断结果"] ?? "",
       "关联模型集合":output["关联模型集合"] ?? output.associatedModels ?? [],"关联模型启动明细":output["关联模型启动明细"] ?? [],"关联模型启动次数":output["关联模型启动次数"] ?? 0,"智选结果":output["智选结果"] ?? output.smartDecision ?? "",
     }

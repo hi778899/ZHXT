@@ -145,7 +145,7 @@ export function approvalTemplate(): TemplatePreset {
   const steps = [
     standard("ap-s1","","业务模型文件名、模型数字化编码、员工数字化编码、数字化属性、数字化标识","读取0622模型数字化配置、员工信息、组织、组织关系、审批分管配置","确定本次审批计算输入","业务内容和审批计算输入",""),
     standard("ap-s2","","审批分管业务范围、阈值设置、组织职级、员工组织数据","先算审批目标，再算具体审批人和路径；新组织重新计算负责人","形成行政审批路径和技术审查路径（现行技术复核路径）","审批人计算、审批路径计算、规定时限",""),
-    standard("ap-s3","当前审批人提交审批意见","当前环节、审批人、审批要求、规定时限、审批意见","按正式审批路径逐环节执行；本环节办理信息的规定时限优先取当前节点审批人计算结果；同意进入下一环节，终止意见结束审批；办理记录耗时=办理时间-到达时间","形成完整审批办理记录；普通用户记录不展示审批/审查要求和规定时限，改为展示实际耗时","审批结果、审批状态、办理记录","审批模型数字化库正式入库后硬性触发智选模型"),
+    standard("ap-s3","当前审批人提交审批意见","当前环节、审批人、审批要求、规定时限、审批意见","按正式审批路径逐环节执行；本环节办理信息的规定时限直接读取模型时限数字化库形成的当前节点正式值；审批人计算仅保留运算留痕，不作为页面反向补值来源；同意进入下一环节，终止意见结束审批；办理记录耗时=办理时间-到达时间","形成完整审批办理记录；普通用户记录不展示审批/审查要求和规定时限，改为展示实际耗时","审批结果、审批状态、办理记录","审批模型数字化库正式入库后硬性触发智选模型"),
   ]
   const design = baseDesign(fields,list,steps,["正式审批路径","审批状态","审批结果","审批办理记录","审批总环节","当前审批环节","当前审批人","审批人计算","审批路径计算","命中数字化标识阈值","规定时限"],{
     approvalSettings:{taskTitle:"{前序业务模型}审批",routeOutputKey:"正式审批路径",resultOutputKey:"审批结果",actions:["同意","不同意","退回修改"],steps:[],assigneeFallback:"error",routeStrategy:"0622_digital_calculation",standardSources:{digitalConfig:"模型数字化配置数字化库",approvalAssignment:"审批分管配置数字化库",personnel:"员工信息数字化库",organization:"组织数字化库",departments:"组织名称数字化库",organizationRelationship:"组织关系数字化库",timeout:"模型时限数字化库",opinions:"审批意见数字化库"},standardSourceIds:{digitalConfig:"lib-standard-digital-config",approvalAssignment:"lib-standard-approval-assignment",personnel:"lib-standard-person",organization:"lib-standard-org-rank",departments:"lib-standard-dept",organizationRelationship:"lib-digital-org-relationship-0622",timeout:"lib-standard-model-timeout",opinions:"lib-standard-approval-opinion"}},
