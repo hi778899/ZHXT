@@ -417,6 +417,7 @@ async function ensurePublishedProjectDigitalConfig(userId:string,row:ProjectRow,
   if(!attr){
     const systemCategories=new Set(["数字化管理","数字化基础","数字化标准","组织标准","审批标准","公共标准","模型建设","审批管理","数字化配置","审批配置","智选配置","智能关联","运行标准","通用"])
     if(category==="考勤管理") attr="5012001005001000000"
+    else if(category==="会议管理" || category==="会议标准") attr="5012001008000000000"
     else if(systemCategories.has(category)) attr="5012001007000000000"
   }
   if(!attr) throw new ModelBuilderError(400,`模型“${row.name}”未配置可确定的业务分类数字化属性，不能发布。请先在业务分类/模型数字化配置数字化库中完成配置`)
