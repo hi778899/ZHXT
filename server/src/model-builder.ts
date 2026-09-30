@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { query } from "./db.js"
 import { evaluateExpression, ExpressionError } from "./expression.js"
 import { blankTemplate, getTemplatePreset } from "./model-templates.js"
-import { buildDisplayFileName, buildRuntimeFileName, getEmployeeDigitalCode, isDigital16, isDigitalIdentifier, isEmployeeDigitalCode, isModelDigitalCode, timeCode } from "./digital-codes.js"
+import { buildDisplayFileName, buildRuntimeFileName, getEmployeeDigitalCode, isCurrentEmployeeDigitalCode, isCurrentModelDigitalCode, isCurrentRuntimeFileName, isDigital16, isDigitalIdentifier, isEmployeeDigitalCode, isModelDigitalCode, timeCode } from "./digital-codes.js"
 import { buildIdentifierValues, ensureModelDigitalLibrary } from "./data-linkage.js"
 import { ModelBuilderError } from "./errors.js"
 import { resolveApprovalPlan0622, resolveSmartPlan0622 } from "./runtime-0622.js"
@@ -408,7 +408,7 @@ export async function publishProject(userId: string, projectId: string) {
   if (!row.test_passed) problems.push("测试阶段尚未通过")
   if (!String(config.storageName ?? "").trim()) problems.push("配置阶段缺少本模型数字化库名称")
   const ids = asArray<string>(config.digitalIdentities).map(v => String(v).trim()).filter(Boolean)
-  if (!isModelDigitalCode(config.modelCode)) problems.push("模型数字化编码必须符合当前19位结构（历史16位兼容）")
+  if (!isCurrentModelDigitalCode(config.modelCode)) problems.push("模型数字化编码必须符合当前19位结构")
   if (!ids.length || ids.some(id => !isDigitalIdentifier(id))) problems.push("数字化标识必须符合当前19位结构（历史16位兼容）")
   const startModes = asArray<string>(config.startModes).map(String).filter(Boolean)
   if (!startModes.length) problems.push("配置阶段至少需要一种模型启动方式")
@@ -518,10 +518,21 @@ function runConfig(row: ProjectRow) { return plainObject(row.configuration) }
 function runDigitalId(row: ProjectRow) { const ids = asArray<string>(runConfig(row).digitalIdentities).map(String).filter(Boolean); return ids[ids.length - 1] ?? "" }
 async function runFileNames(row: ProjectRow, user: BuilderUser) {
   const modelCode = String(runConfig(row).modelCode ?? "").trim()
-  if (!isModelDigitalCode(modelCode)) throw new ModelBuilderError(409, `模型“${row.name}”未配置有效模型数字化编码（当前19位；历史16位兼容）`)
-  const employeeCode = isEmployeeDigitalCode(user.employee_code) ? String(user.employee_code) : await getEmployeeDigitalCode(user.id)
-  const stamp = timeCode()
-  return { fileName: buildRuntimeFileName(modelCode, employeeCode, stamp), displayFileName: buildDisplayFileName(row.name, user.display_name, stamp) }
+  if (!isCurrentModelDigitalCode(modelCode)) throw new ModelBuilderError(409, `模型“${row.name}”未配置当前19位模型数字化编码，禁止继续生成旧格式模型文件名`)
+  const employeeCode = isCurrentEmployeeDigitalCode(user.employee_code) ? String(user.employee_code) : await getEmployeeDigitalCode(user.id)
+  const now = new Date()
+  const baseStamp = timeCode(now)
+  const candidates = [
+    baseStamp,
+    `${baseStamp}${String(now.getMilliseconds()).padStart(3,"0")}`,
+    ...Array.from({length:999},(_,index)=>`${baseStamp}${String(now.getMilliseconds()).padStart(3,"0")}${String(index+1).padStart(3,"0")}`),
+  ]
+  for (const stamp of candidates) {
+    const fileName = buildRuntimeFileName(modelCode, employeeCode, stamp)
+    const exists = await query<{ exists:boolean }>("SELECT EXISTS(SELECT 1 FROM model_runs WHERE file_name=$1) AS exists",[fileName])
+    if (!exists.rows[0]?.exists) return { fileName, displayFileName: buildDisplayFileName(row.name, user.display_name, stamp) }
+  }
+  throw new ModelBuilderError(409,"同一模型、人员和时间窗口内运行次数超过文件名时间码容量，请稍后重试")
 }
 function approvalSettings(row: ProjectRow) { return plainObject(row.design?.approvalSettings) }
 type ApprovalStepDefinition = {
@@ -1388,12 +1399,12 @@ async function applyDigitalAdministrationModel(modelName: string, input: Record<
     const code=`D${String(Date.now()).slice(-9)}`
     await query("INSERT INTO digital_definitions(id,code,name,definition_type,definition_text) VALUES($1,$2,$3,$4,$5) ON CONFLICT(code) DO UPDATE SET name=EXCLUDED.name,definition_type=EXCLUDED.definition_type,definition_text=EXCLUDED.definition_text,updated_at=now()",[randomUUID(),code,name,type,String(values.definitionText ?? "")])
   } else if (modelName === "模型数字化编码模型") {
-    const target=String(values.targetModelName ?? "").trim(); const code=String(values.modelDigitalCode ?? "").trim(); if(!target||!isModelDigitalCode(code)) return
+    const target=String(values.targetModelName ?? "").trim(); const code=String(values.modelDigitalCode ?? "").trim(); if(!target||!isCurrentModelDigitalCode(code)) return
     const model=await query<any>("SELECT id FROM models WHERE name=$1",[target]); if(!model.rows[0]) throw new ModelBuilderError(404,"所选模型不存在")
     await query("INSERT INTO digital_codes(id,object_type,object_id,code,display_name) VALUES($1,'model',$2,$3,$4) ON CONFLICT(object_type,object_id) DO UPDATE SET code=EXCLUDED.code,display_name=EXCLUDED.display_name,updated_at=now()",[randomUUID(),model.rows[0].id,code,target])
     await query("UPDATE model_projects SET configuration=jsonb_set(configuration,'{modelCode}',to_jsonb($1::text),true),updated_at=now() WHERE model_id=$2",[code,model.rows[0].id])
   } else if (modelName === "人员数字化编码模型") {
-    const person=String(values.personName ?? "").trim(); const code=String(values.personDigitalCode ?? "").trim(); if(!person||!isEmployeeDigitalCode(code)) return
+    const person=String(values.personName ?? "").trim(); const code=String(values.personDigitalCode ?? "").trim(); if(!person||!isCurrentEmployeeDigitalCode(code)) return
     const user=await query<any>("SELECT id FROM users WHERE display_name=$1 AND status='active' ORDER BY created_at LIMIT 1",[person]); if(!user.rows[0]) throw new ModelBuilderError(404,"所选人员不存在")
     await query("UPDATE users SET employee_code=$1,updated_at=now() WHERE id=$2",[code,user.rows[0].id])
     await query("INSERT INTO digital_codes(id,object_type,object_id,code,display_name) VALUES($1,'person',$2,$3,$4) ON CONFLICT(object_type,object_id) DO UPDATE SET code=EXCLUDED.code,display_name=EXCLUDED.display_name,updated_at=now()",[randomUUID(),user.rows[0].id,code,person])
@@ -1423,6 +1434,17 @@ async function applyDigitalAdministrationModel(modelName: string, input: Record<
   }
 }
 
+async function assertCurrentRuntimeFile(runId: string, fileName: string) {
+  if (!isCurrentRuntimeFileName(fileName)) throw new ModelBuilderError(409,"当前运行仍使用旧模型文件名，必须先完成V17.7.11文件名迁移后才能继续办理或跨模型流转")
+  try {
+    const issue=await query<{reason:string}>("SELECT reason FROM model_file_name_migration_issues WHERE run_id=$1 AND resolved_at IS NULL LIMIT 1",[runId])
+    if (issue.rows[0]?.reason) throw new ModelBuilderError(409,`当前运行的模型文件名迁移存在异常：${issue.rows[0].reason}`)
+  } catch (error) {
+    if (error instanceof ModelBuilderError) throw error
+    // 新库尚未执行V17.7.11迁移表时，仍以当前文件名格式作为硬校验。
+  }
+}
+
 async function archiveRun(row: ProjectRow, user: BuilderUser, runId: string, fileName: string, displayFileName: string, digitalId: string, input: Record<string, unknown>, output: Record<string, unknown>, status = "已归档") {
   const config = runConfig(row)
   await query("UPDATE model_runs SET output_data=$1,status=$2,completed_at=now() WHERE id=$3", [JSON.stringify(output), status, runId])
@@ -1447,6 +1469,7 @@ async function recordModelTriggerFailure(row: ProjectRow, runId: string, fileNam
 }
 
 async function triggerAfterArchive(user: BuilderUser, row: ProjectRow, runId: string, fileName: string, displayFileName: string, digitalId: string, input: Record<string, unknown>, output: Record<string, unknown>, depth: number) {
+  await assertCurrentRuntimeFile(runId,fileName)
   const type = modelTypeOf(row)
   // V17.5 当前智选：按“数字化标识 → 关联数字化标识 → 模型数字化配置”展开，每个标识下每条有效数据各触发一次。
   if (type === "smart") {
@@ -1692,6 +1715,7 @@ export async function handleModelTodo(user: BuilderUser, todoId: string, resultN
   if (!current) throw new ModelBuilderError(404, "待办不存在")
   if (!current.run_id || !current.project_id) return { handled: false as const }
   if (["已完成", "已退回"].includes(String(current.status))) throw new ModelBuilderError(409, "该待办已经办理")
+  await assertCurrentRuntimeFile(String(current.run_id),String(current.file_name ?? ""))
   const projectRow: ProjectRow = {
     id: current.project_id, model_id: current.model_id, owner_id: current.run_owner_id, stage: "config", status: "published", suggestion: current.suggestion ?? {}, design: current.design ?? {}, test_data: {}, test_report: {}, configuration: current.configuration ?? {}, test_passed: true, version: 1, published_at: null, created_at: new Date(), updated_at: new Date(), name: current.model_name, category: "", description: "", can_start: true,
   }
@@ -1840,7 +1864,7 @@ export async function submitBuildStage(user: BuilderUser, projectId: string, sta
   if (stageKey === "test" && !row.test_passed) throw new ModelBuilderError(409,"模型测试用例尚未通过，不能归档模型测试模型")
   if (stageKey === "config") {
     const ids = asArray<string>(plainObject(row.configuration).digitalIdentities).map(String)
-    if (!isModelDigitalCode(plainObject(row.configuration).modelCode) || !ids.length || ids.some(id=>!isDigitalIdentifier(id))) throw new ModelBuilderError(409,"模型配置中的模型数字化编码或数字化标识尚未完成（当前结构优先，历史16位兼容）")
+    if (!isCurrentModelDigitalCode(plainObject(row.configuration).modelCode) || !ids.length || ids.some(id=>!isDigitalIdentifier(id))) throw new ModelBuilderError(409,"模型配置中的模型数字化编码必须为当前19位结构，且数字化标识配置必须完整")
   }
   const existing = await query<any>("SELECT stage_run_id FROM model_build_stage_runs WHERE target_project_id=$1 AND stage_key=$2",[projectId,stageKey])
   if (existing.rows[0]?.stage_run_id) {

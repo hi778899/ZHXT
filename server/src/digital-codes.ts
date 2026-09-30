@@ -2,7 +2,7 @@ import { query } from "./db.js"
 
 export const EMPLOYEE_CODE_PREFIX = "5011002"
 export const LEGACY_DIGITAL_16_PATTERN = /^\d{16}$/
-export const CURRENT_MODEL_DIGITAL_CODE_PATTERN = /^\d{19}$/
+export const CURRENT_MODEL_DIGITAL_CODE_PATTERN = /^5011001\d{12}$/
 export const CURRENT_EMPLOYEE_DIGITAL_CODE_PATTERN = /^5011002\d{4}$/
 export const CURRENT_DIGITAL_IDENTIFIER_PATTERN = /^5013\d{15}$/
 export const CURRENT_BUSINESS_ATTRIBUTE_PATTERN = /^5012001\d{12}$/
@@ -63,10 +63,17 @@ export function timeCode(date = new Date()) {
   return `${get("year")}${get("month")}${get("day")}${get("hour")}${get("minute")}${get("second")}`
 }
 
+export const CURRENT_RUNTIME_FILE_NAME_PATTERN = /^5011001\d{12}-5011002\d{4}-\d{14}(?:\d{3})?(?:\d{3})?$/
+
 export function buildRuntimeFileName(modelCode: string, employeeCode: string, stamp: string) {
-  if (!isModelDigitalCode(modelCode)) throw new Error("模型数字化编码必须符合当前19位结构；历史16位仅兼容读取")
-  if (!isEmployeeDigitalCode(employeeCode)) throw new Error("发起人员工数字化编码必须符合当前11位结构；历史16位仅兼容读取")
+  if (!isCurrentModelDigitalCode(modelCode)) throw new Error("模型运行必须使用当前19位模型数字化编码")
+  if (!isCurrentEmployeeDigitalCode(employeeCode)) throw new Error("模型运行必须使用当前11位员工数字化编码")
+  if (!/^\d{14}(?:\d{3})?(?:\d{3})?$/.test(stamp)) throw new Error("模型运行时间码格式无效")
   return `${modelCode}-${employeeCode}-${stamp}`
+}
+
+export function isCurrentRuntimeFileName(value: unknown) {
+  return CURRENT_RUNTIME_FILE_NAME_PATTERN.test(String(value ?? "").trim())
 }
 
 export function displayModelName(modelName: string) {
@@ -80,7 +87,7 @@ export function buildDisplayFileName(modelName: string, displayName: string, sta
 export async function getEmployeeDigitalCode(userId: string) {
   const result = await query<{ employee_code: string }>("SELECT employee_code FROM users WHERE id=$1", [userId])
   const code = String(result.rows[0]?.employee_code ?? "").trim()
-  if (!isEmployeeDigitalCode(code)) throw new Error("当前人员未配置有效员工数字化编码（当前11位；历史16位兼容）")
+  if (!isCurrentEmployeeDigitalCode(code)) throw new Error("当前人员未配置当前11位员工数字化编码")
   return code
 }
 

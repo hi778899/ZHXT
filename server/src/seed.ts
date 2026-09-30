@@ -133,7 +133,7 @@ async function seed() {
   let userId = user.rows[0]?.id
   if (!userId) {
     userId = randomUUID()
-    await query("INSERT INTO users(id, username, display_name, department, employee_code, password_hash, role) VALUES($1,$2,$3,$4,$5,$6,$7)", [userId, process.env.INITIAL_ADMIN_USERNAME ?? "zhangshan", process.env.INITIAL_ADMIN_NAME ?? "张珊", process.env.INITIAL_ADMIN_DEPARTMENT ?? "设备管理部", "5011002000000001", await hashPassword(initialPassword), "admin"])
+    await query("INSERT INTO users(id, username, display_name, department, employee_code, password_hash, role) VALUES($1,$2,$3,$4,$5,$6,$7)", [userId, process.env.INITIAL_ADMIN_USERNAME ?? "zhangshan", process.env.INITIAL_ADMIN_NAME ?? "张珊", process.env.INITIAL_ADMIN_DEPARTMENT ?? "设备管理部", "50110020015", await hashPassword(initialPassword), "admin"])
     console.log(`Created initial user ${process.env.INITIAL_ADMIN_USERNAME ?? "zhangshan"}`)
   }
 
@@ -143,7 +143,7 @@ async function seed() {
     displayName: process.env.DEPARTMENT_MANAGER_NAME ?? "部门经理",
     department: defaultDepartment,
     password: process.env.DEPARTMENT_MANAGER_PASSWORD ?? "ChangeDeptManager123!",
-    employeeCode: "5011002000000002",
+    employeeCode: "50110020016",
     role: "department_manager",
   })
   await ensureRoleAccount({
@@ -151,7 +151,7 @@ async function seed() {
     displayName: process.env.ATTENDANCE_SUPERVISOR_NAME ?? "考勤主管",
     department: process.env.ATTENDANCE_SUPERVISOR_DEPARTMENT ?? "综合管理部",
     password: process.env.ATTENDANCE_SUPERVISOR_PASSWORD ?? "ChangeAttendance123!",
-    employeeCode: "5011002000000003",
+    employeeCode: "50110020017",
     role: "attendance_supervisor",
   })
 
