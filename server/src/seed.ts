@@ -1,4 +1,5 @@
 import { syncActiveEmployeeApprovalDigitalConfigs } from "./employee-digital-config.js"
+import { syncSystemStandardLibraryRecords } from "./data-linkage.js"
 import { randomUUID } from "node:crypto"
 import { closePool, query } from "./db.js"
 import { hashPassword } from "./security.js"
@@ -54,6 +55,31 @@ async function ensurePublishedProject(modelName: string, userId: string, templat
     await query("UPDATE model_projects SET stage='config',status='published',suggestion=$1,design=$2,test_data=$3,test_report=$4,configuration=$5,test_passed=true,published_at=COALESCE(published_at,now()),updated_at=now() WHERE id=$6", [JSON.stringify(template.suggestion), JSON.stringify(template.design), JSON.stringify(template.testData), JSON.stringify(report), JSON.stringify(template.configuration), project.rows[0].id])
   }
   await query("UPDATE models SET can_start=true WHERE id=$1", [model.rows[0].id])
+  const modelCode=String(template.configuration?.modelCode ?? "").trim()
+  if(/^5011001[0-9]{12}$/.test(modelCode)) {
+    await query(`INSERT INTO digital_codes(id,object_type,object_id,code,display_name) VALUES($1,'model',$2,$3,$4)
+      ON CONFLICT(object_type,object_id) DO UPDATE SET code=EXCLUDED.code,display_name=EXCLUDED.display_name,updated_at=now()`,[`dcode-seed-${model.rows[0].id}`,model.rows[0].id,modelCode,modelName])
+  }
+}
+
+async function ensureInfrastructureDigitalProjects(userId:string) {
+  // 0622 新增的三类基础数字化库必须同样拥有正式数据产生模型项目和19位模型数字化编码，供系统初始化/同步形成真实 model_runs。
+  const specs=[
+    {name:"业务分类模型",code:"5011001001100023001",storageName:"业务分类数字化库"},
+    {name:"组织关系模型",code:"5011001001100024001",storageName:"组织关系数字化库"},
+    {name:"员工数字化模型",code:"5011001001100025001",storageName:"员工数字化库"},
+  ]
+  for(const spec of specs){
+    const model=await query<{id:string}>("SELECT id FROM models WHERE name=$1 LIMIT 1",[spec.name])
+    if(!model.rows[0]?.id) continue
+    const template:TemplatePreset={
+      suggestion:{name:spec.name,category:"数字化基础",description:`${spec.name}的数据产生模型`,modelType:"business",goal:`维护${spec.storageName}正式数据`,scope:"系统初始化、系统同步和人工维护均形成真实模型运行",startModes:["manual"],ownerDepartment:"设备管理部"},
+      design:{fields:[],nodes:[],edges:[],parameters:[],calculations:[],expressions:[],rules:[],formula:"",outputKeys:[],formSettings:{columns:2,labelPosition:"top",descriptionMode:"inline",inputWidth:"auto",submitText:"提交数字化数据",showHeader:true}},
+      testData:{cases:[]},
+      configuration:{modelCode:spec.code,fileNameRule:"模型数字化编码-发起/运行人员员工数字化编码-时间码",displayFileNameRule:"模型中文名称-发起人姓名-时间码",storageName:spec.storageName,digitalIdentities:[],isStandardLibrary:true,allowAsSource:true,startModes:["manual"],relations:[{id:`rel-${spec.code}-approval`,enabled:true,mode:"hard_link",targetModelName:"审批模型",condition:{fieldKey:"",operator:"always",value:""},description:"人工维护正式数据归档后进入通用审批模型"}],afterArchiveEnabled:true,nextModelName:"审批模型",visibility:"internal",digitalStructureVersion:"0622"}
+    }
+    await ensurePublishedProject(spec.name,userId,template)
+  }
 }
 
 async function ensureSystemModelClusterLinks() {
@@ -196,6 +222,7 @@ async function seed() {
   await ensurePublishedProject("智选模型", userId, smart)
   await ensurePublishedProject("审批模型", userId, approval)
   await ensurePublishedProject("请休假模型", userId, leave)
+  await ensureInfrastructureDigitalProjects(userId)
   // 系统固定模型簇链路必须兼容历史已编辑项目；不能依赖 version=1 的模板刷新。
   await ensureSystemApprovalSmartLink()
 
@@ -210,6 +237,9 @@ async function seed() {
     const template = getTemplatePreset(item.key)
     if (template) await ensureDraftProject(item.name, userId, template)
   }
+
+  // 方案A：数据产生模型和当前19位编码全部就绪后，再将系统初始化/同步数据通过对应模型运行归档；此时不得留下 run_id=NULL 的正式库记录。
+  await syncSystemStandardLibraryRecords()
 
   const notices = [["关于驾驶舱要素调整的通知", "通知", "2026-09-01"], ["模型建设阶段说明更新", "说明", "2026-08-30"], ["数字化库使用指引发布", "指引", "2026-08-28"], ["系统维护安排", "通知", "2026-08-24"], ["公共信息阅读提醒", "提醒", "2026-08-22"], ["驾驶舱功能优化公告", "公告", "2026-08-20"], ["本月模型运行情况汇总", "汇总", "2026-08-18"]]
   for (const [title, type, publishedAt] of notices) await query("INSERT INTO notices(id,title,type,published_at,content) VALUES($1,$2,$3,$4,$5) ON CONFLICT (lower(trim(title)), lower(trim(type)), published_at) DO NOTHING", [randomUUID(), title, type, publishedAt, `${title}正文内容。请各部门结合实际使用情况及时反馈问题，持续优化驾驶舱的操作体验。`])

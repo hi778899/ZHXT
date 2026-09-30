@@ -1,0 +1,45 @@
+智慧企业治理系统 18.3.6.18 / V17.7.14
+数字化库全量模型运行归档修正说明（方案A）
+
+一、修正目标
+解决业务定义数字化库、数字化对象类型数字化库、员工/组织/时限/审批配置等库中“文件名”仍显示 std-*、src0622-* 等历史技术记录键的问题。
+
+二、正式规则
+所有正式数字化库记录必须由对应数据产生模型的一次真实运行形成：
+数据产生模型 → model_runs → 标准模型文件名 → digital_library_records(run_id, file_name)
+
+标准模型文件名：
+19位模型数字化编码-11位发起/运行人员员工数字化编码-时间码
+
+三、历史数据迁移
+新增 migration：026_materialize_all_digital_library_records_as_model_runs.sql
+1. 历史 run_id=NULL 记录先标记 migration_pending；
+2. V17.7.13 曾直接补出的文件名退回 legacy_file_name 审计字段；
+3. 使用原 created_at、数据产生模型当前19位编码、当前11位运行人员编码形成 system_initialization 模型运行；
+4. 回填真实 run_id、file_name、display_file_name；
+5. std-* / src0622-* / auto0622-* 仅保留 legacy_record_id，不再作为文件名；
+6. 无法安全物化的记录进入 digital_library_run_materialization_issues，不进行猜测绑定。
+
+四、以后数据形成
+系统初始化、账号/部门/模型目录等系统同步也不得直接写正式数字化库：
+- 首次/历史物化：trigger_mode=system_initialization
+- 后续系统源数据变化：trigger_mode=system_sync
+- 普通业务运行：继续使用正常模型运行归档
+
+五、数据库硬约束
+- 正式数字化库记录 run_id 不得为空；
+- file_name 必须符合当前标准格式；
+- digital_library_records.file_name 必须与对应 model_runs.file_name 完全一致；
+- migration_pending 只允许历史迁移暂存，正常 seed/sync 不得主动生成。
+
+六、数据产生模型补齐
+统一0622后的模型名称，并确保基础数字化库/审批智选配置的数据产生模型具有已发布项目和当前19位模型数字化编码。
+另外补齐业务分类模型、组织关系模型、员工数字化模型的正式发布项目。
+
+七、历史修复机制
+旧数据 identifier_values 修复不再在列表查询时直接 UPDATE 正式数字化库或修改原 model_runs；需要修复时形成新的 system_sync 模型运行后再归档。
+
+八、验收
+- V17.3.1～V17.7.14 项目回归测试通过；
+- 本次修改的 TS/TSX 文件已完成 TypeScript 语法转译检查；
+- 当前执行环境无法访问 npm registry，未执行完整 pnpm build:all，生产编译由部署服务器 docker compose up -d --build 最终验证。

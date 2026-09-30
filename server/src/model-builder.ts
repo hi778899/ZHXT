@@ -1074,7 +1074,7 @@ async function resolveApprovalOwner(step: ApprovalStepDefinition, input: Record<
   if (step.assigneeScope === "named_user" && step.userName) {
     const named = await query<{ id: string }>("SELECT id FROM users WHERE status='active' AND display_name=$1 ORDER BY created_at LIMIT 1", [step.userName])
     if (named.rows[0]?.id) return named.rows[0].id
-    // 系统初始化示例允许用岗位中文名做占位；真实配置通过人员信息数字化库选择具体人员后会直接命中姓名。
+    // 系统初始化示例允许用岗位中文名做占位；真实配置通过员工信息数字化库选择具体人员后会直接命中姓名。
     if (step.userName === "部门经理" && department) {
       const found = await query<{ id: string }>("SELECT id FROM users WHERE status='active' AND role='department_manager' AND department=$1 ORDER BY created_at LIMIT 1", [department])
       if (found.rows[0]?.id) return found.rows[0].id
@@ -1083,7 +1083,7 @@ async function resolveApprovalOwner(step: ApprovalStepDefinition, input: Record<
       const found = await query<{ id: string }>("SELECT id FROM users WHERE status='active' AND role='attendance_supervisor' ORDER BY created_at LIMIT 1")
       if (found.rows[0]?.id) return found.rows[0].id
     }
-    throw new ModelBuilderError(409, `未找到审批人“${step.userName}”，请通过人员信息模型和岗位分选模型维护审批人员`)
+    throw new ModelBuilderError(409, `未找到审批人“${step.userName}”，请通过员工信息模型和岗位分选模型维护审批人员`)
   }
   // 兼容旧审批模型配置。
   const title = step.title
@@ -1097,7 +1097,7 @@ async function resolveApprovalOwner(step: ApprovalStepDefinition, input: Record<
   }
   const named = await query<{ id: string }>("SELECT id FROM users WHERE status='active' AND display_name=$1 ORDER BY created_at LIMIT 1", [title])
   if (named.rows[0]?.id) return named.rows[0].id
-  throw new ModelBuilderError(409, `${step.title}未匹配到有效审批人，请检查审批分管配置、岗位分选和人员信息数字化库`)
+  throw new ModelBuilderError(409, `${step.title}未匹配到有效审批人，请检查审批分管配置、岗位分选和员工信息数字化库`)
 }
 
 function flattenArchiveInput(sourceModelName: string, sourceFileName: string, sourceDisplayFileName: string, sourceDigitalId: string, sourceRunId: string, input: Record<string, unknown>, output: Record<string, unknown>) {
@@ -1263,7 +1263,7 @@ async function sourceBusinessSmartRelations(input: Record<string, unknown>, outp
     relations.push(...configRelations(runConfig(businessProject)).filter(item => item.enabled !== false && item.mode === "smart" && relationMatches(item, values, values)))
   }
 
-  // 通用智选模型读取设计阶段配置的“标识触发配置数字化库”。
+  // 通用智选模型读取设计阶段配置的“标识关联配置数字化库”。
   // 每条配置本身也是模型运行结果：业务数字化标识 -> 目标模型；新增业务模型后无需修改智选代码。
   const smartProject=await fetchProject("m.name=$1 AND p.status='published'","智选模型")
   const smartSourceIds=plainObject(smartProject?.design?.smartStandardSourceIds)
@@ -1453,8 +1453,8 @@ async function archiveRun(row: ProjectRow, user: BuilderUser, runId: string, fil
   const libraryId = await ensureModelDigitalLibrary(row.id)
   const identifierValues = await buildIdentifierValues(row.id, input, output)
   const libraryName = String(config.storageName ?? `${row.name}数字化库`)
-  if (!exists.rowCount) await query("INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", [randomUUID(), row.model_id, row.id, runId, user.id, libraryName, digitalId, libraryId, JSON.stringify(identifierValues), JSON.stringify(archiveData)])
-  else await query("UPDATE digital_library_records SET library_name=$1,digital_id=$2,library_id=$3,identifier_values=$4,data=$5 WHERE run_id=$6", [libraryName, digitalId, libraryId, JSON.stringify(identifierValues), JSON.stringify(archiveData), runId])
+  if (!exists.rowCount) await query("INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data,file_name,display_file_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [randomUUID(), row.model_id, row.id, runId, user.id, libraryName, digitalId, libraryId, JSON.stringify(identifierValues), JSON.stringify(archiveData), fileName, displayFileName])
+  else await query("UPDATE digital_library_records SET library_name=$1,digital_id=$2,library_id=$3,identifier_values=$4,data=$5,file_name=$6,display_file_name=$7 WHERE run_id=$8", [libraryName, digitalId, libraryId, JSON.stringify(identifierValues), JSON.stringify(archiveData), fileName, displayFileName, runId])
 }
 
 async function recordModelTriggerFailure(row: ProjectRow, runId: string, fileName: string, targetModelName: string, triggerMode: TriggerMode, error: unknown) {

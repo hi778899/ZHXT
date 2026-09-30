@@ -1,0 +1,9 @@
+18.3.6.17 / V17.7.13 数字化库文件名全库统一修正说明
+
+1. 修复数字化库中只有请休假模型数字化库显示标准模型文件名、其他大量库退回显示 record_id/src0622-* 的问题。
+2. digital_library_records 新增 file_name、display_file_name、legacy_file_name；数字化库记录自身持久化标准文件名。
+3. 真实模型运行形成的记录与 model_runs.file_name 强一致。
+4. 历史 seed/系统同步记录按所属模型当前19位模型数字化编码 + 原责任人/迁移运行人员当前11位员工数字化编码 + 原 created_at 时间码生成文件名；同秒冲突追加顺序码。
+5. 数字化库页面禁止使用 record_id 作为文件名兜底；无法迁移时明确显示“未形成标准模型文件名”。
+6. 新增 migration 025_digital_library_canonical_file_names.sql，并记录 digital_library_file_name_migration_issues。
+7. 更新 .ai/rules，明确所有数字化库（业务、审批、智选、员工、组织、模型时限、审批分管等）统一执行同一文件名规则。

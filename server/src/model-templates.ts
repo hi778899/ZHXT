@@ -43,8 +43,8 @@ export const MODEL_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   { key: "digital_attribute", name: "数字化属性配置模型", shortName: "属性配置", category: "数字化管理", group: "数字化建设", description: "在模型、人员等数字化编码对象下配置数字化属性。", source: "模型·库推演技术总结20260820", modelType: "digital", startModes: ["manual"] },
   { key: "digital_identifier", name: "数字化标识建设模型", shortName: "标识建设", category: "数字化管理", group: "数字化建设", description: "建立当前19位数字化标识、中文显示名称、数据类型和业务归属。", source: "模型·库推演技术总结20260820", modelType: "digital", startModes: ["manual"] },
   { key: "digital_library", name: "数字化库配置模型", shortName: "数字化库", category: "数字化管理", group: "数字化建设", description: "将数字化标识组合成数字化库，并配置数字化库和数据源能力。", source: "模型·库推演技术总结20260820", modelType: "digital", startModes: ["manual"] },
-  { key: "std_person", name: "人员信息模型", shortName: "人员信息", category: "数字化基础", group: "基础数字化库", description: "维护人员姓名、账号、部门、角色等数字化数据；人员选择类字段统一引用本模型数字化库。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
-  { key: "std_department", name: "部门信息模型", shortName: "部门信息", category: "数字化基础", group: "基础数字化库", description: "维护部门名称、上级部门和组织性质等数字化数据。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "std_person", name: "员工信息模型", shortName: "员工信息", category: "数字化基础", group: "基础数字化库", description: "维护人员姓名、账号、部门、角色等数字化数据；人员选择类字段统一引用本模型数字化库。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "std_department", name: "组织名称数字化模型", shortName: "组织名称", category: "数字化基础", group: "基础数字化库", description: "维护部门名称、上级部门和组织性质等数字化数据。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
   { key: "std_leave_type", name: "请假类型标准模型", shortName: "请假类型", category: "数字化基础", group: "基础数字化库", description: "维护请假类型数字化数据，供请休假等模型下拉选择。", source: "数字化库设计", modelType: "business", startModes: ["manual"] },
   { key: "std_model_info", name: "模型信息标准模型", shortName: "模型信息", category: "数字化基础", group: "基础数字化库", description: "形成可供其他模型选择的模型名称、类别、当前模型数字化编码和状态数据。", source: "数字化配置模型初稿", modelType: "business", startModes: ["manual"] },
   { key: "std_digital_type", name: "数字化类型标准模型", shortName: "数字化类型", category: "数字化标准", group: "基础数字化库", description: "维护数字化编码、数字化属性、数字化标识等数字化类型标准。", source: "数字化配置模型初稿", modelType: "business", startModes: ["manual"] },
@@ -62,16 +62,16 @@ export const MODEL_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   { key: "std_meeting_room", name: "会议室标准模型", shortName: "会议室", category: "会议标准", group: "基础数字化库", description: "维护会议室数字化数据。", source: "会议组织模型初稿", modelType: "business", startModes: ["manual"] },
   { key: "std_review_opinion", name: "议题审定意见标准模型", shortName: "审定意见", category: "会议标准", group: "基础数字化库", description: "维护同意上会、不同意上会等议题审定意见。", source: "会议议题审定模型初稿", modelType: "business", startModes: ["manual"] },
   { key: "std_yes_no", name: "是否标准模型", shortName: "是否", category: "公共标准", group: "基础数字化库", description: "维护是/否数字化值，供需要下拉选择的模型复用。", source: "数字化库设计", modelType: "business", startModes: ["manual"] },
-  { key: "std_org_rank", name: "组织职级标准模型", shortName: "组织职级", category: "组织标准", group: "基础数字化库", description: "维护组织性质、组织层级、职级含义等组织职级标准，供审批层级与人员匹配使用。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
-  { key: "std_threshold_type", name: "阈值类型标准模型", shortName: "阈值类型", category: "审批标准", group: "基础数字化库", description: "维护金额、人员、天数等阈值类型标准。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
-  { key: "std_model_timeout", name: "模型时限标准模型", shortName: "模型时限", category: "运行标准", group: "基础数字化库", description: "维护模型办理时限标准，供审批提醒和模型运行时限配置使用。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
-  { key: "config_digital", name: "数字化配置模型", shortName: "数字化配置", category: "数字化配置", group: "审批智选配置", description: "为已分配数字化编码的对象配置数字化属性与数字化标识。", source: "数字化配置模型初稿", modelType: "digital", startModes: ["manual"] },
+  { key: "std_org_rank", name: "组织数字化模型", shortName: "组织数字化", category: "组织标准", group: "基础数字化库", description: "维护组织性质、组织层级、职级含义等组织职级标准，供审批层级与人员匹配使用。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "std_threshold_type", name: "阈值类属模型", shortName: "阈值类属", category: "审批标准", group: "基础数字化库", description: "维护金额、人员、天数等阈值类型标准。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "std_model_timeout", name: "模型时限模型", shortName: "模型时限", category: "运行标准", group: "基础数字化库", description: "维护模型办理时限标准，供审批提醒和模型运行时限配置使用。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "config_digital", name: "模型数字化配置模型", shortName: "模型数字化配置", category: "数字化配置", group: "审批智选配置", description: "为已分配数字化编码的对象配置数字化属性与数字化标识。", source: "数字化配置模型初稿", modelType: "digital", startModes: ["manual"] },
   { key: "config_digital_display", name: "数字化展示模型", shortName: "数字化展示", category: "数字化配置", group: "审批智选配置", description: "按当前人员、部门和业务授权范围展示数字化编码、属性、标识及中文名称。", source: "数字化配置模型初稿", modelType: "digital", startModes: ["manual"] },
   { key: "config_admin_approval", name: "行政审批层级分选模型", shortName: "行政分选", category: "审批配置", group: "审批智选配置", description: "按业务层级配置行政审批层级。", source: "审批智选模型初稿", modelType: "business", startModes: ["manual"] },
   { key: "config_business_approval", name: "业务审批层级分选模型", shortName: "业务分选", category: "审批配置", group: "审批智选配置", description: "按业务层级配置业务审批层级。", source: "审批智选模型初稿", modelType: "business", startModes: ["manual"] },
   { key: "config_position", name: "岗位分选模型", shortName: "岗位分选", category: "审批配置", group: "审批智选配置", description: "按业务事项配置使用岗、审查岗和管理岗。", source: "审批智选模型初稿", modelType: "business", startModes: ["manual"] },
-  { key: "config_identifier_trigger", name: "标识触发配置模型", shortName: "标识触发", category: "智选配置", group: "审批智选配置", description: "配置业务数字化标识与后续目标模型之间的引用关系，供通用智选模型读取。", source: "审批智选模型初稿", modelType: "business", startModes: ["manual"] },
-  { key: "config_business_ownership", name: "业务归属配置模型", shortName: "业务归属", category: "数字化配置", group: "审批智选配置", description: "配置组织/部门与业务领域之间的归属关系。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
+  { key: "config_identifier_trigger", name: "标识关联配置模型", shortName: "标识关联", category: "智选配置", group: "审批智选配置", description: "配置业务数字化标识与后续目标模型之间的引用关系，供通用智选模型读取。", source: "审批智选模型初稿", modelType: "business", startModes: ["manual"] },
+  { key: "config_business_ownership", name: "业务归属模型", shortName: "业务归属", category: "数字化配置", group: "审批智选配置", description: "配置组织/部门与业务领域之间的归属关系。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
   { key: "config_approval_assignment", name: "审批分管配置模型", shortName: "审批分管", category: "审批配置", group: "审批智选配置", description: "配置组织职级对应的行政审批业务范围、业务审批范围及阈值调整规则。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
   { key: "config_threshold", name: "审批阈值配置模型", shortName: "审批阈值", category: "审批配置", group: "审批智选配置", description: "配置金额、人员、天数等数字化标识的审批阈值规则。", source: "数字化编码与审批数字化库20260810.docx", modelType: "business", startModes: ["manual"] },
   { key: "meeting_topic", name: "会议议题提报", shortName: "议题提报", category: "会议管理", group: "会议模型簇", description: "根据会议类型匹配对应议题模板，形成议题提报结果。", source: "1.会议议题提报模型20260727.docx", modelType: "business", startModes: ["manual", "smart"] },
@@ -113,7 +113,7 @@ export function leaveTemplate(): TemplatePreset {
   const suggestion = baseSuggestion("请休假模型", "考勤管理", "采集请休假申请、读取人员组织信息、计算请假天数并形成独立业务归档记录", "business", ["manual"], "形成完整的请休假业务申请记录并归档到请休假模型数字化库；归档后按模型关系触发独立审批模型。", "全体在职人员，按当前用户和组织关系读取数据。")
   const fields = [
     f("leave-applicant", "申请人", "applicant", "user", { digitalId:"5013001005001101", readonly: true, source: "当前用户", sourceMode:"current_user", required: false }),
-    f("leave-department", "所属部门", "department", "department", { digitalId:"5013001005001102", readonly: true, required: false, sourceMode:"library_fill", linkage: { sourceLibraryId:"lib-standard-person", sourceLibrary:"人员信息数字化库", triggerFieldKey:"applicant", matchDigitalId:"5013001001002002", sourceDigitalId:"5013001001002004", mode:"fill" } }),
+    f("leave-department", "所属部门", "department", "department", { digitalId:"5013001005001102", readonly: true, required: false, sourceMode:"library_fill", linkage: { sourceLibraryId:"lib-standard-person", sourceLibrary:"员工信息数字化库", triggerFieldKey:"applicant", matchDigitalId:"5013001001002002", sourceDigitalId:"5013001001002004", mode:"fill" } }),
     f("leave-type", "请假类型", "leaveType", "dataSelect", { digitalId:"5013001005001103", required: true, sourceMode:"library_select", linkage:{ sourceLibraryId:"lib-standard-leave-type", sourceLibrary:"请假类型数字化库", sourceDigitalId:"5013001001004002", mode:"options" } }),
     f("leave-start", "开始日期", "startDate", "date", { digitalId:"5013001005001104", sourceMode:"manual", required: true }), f("leave-end", "结束日期", "endDate", "date", { digitalId:"5013001005001105", sourceMode:"manual", required: true }),
     f("leave-reason", "请假事由", "reason", "textarea", { digitalId:"5013001005001107", sourceMode:"manual", required: true, width: 12, minLength: 2, placeholder: "请说明请假原因及工作交接安排" }),
@@ -204,21 +204,21 @@ function standardLibraryTemplate(key:TemplateKey):TemplatePreset|null {
   const meta=MODEL_TEMPLATE_CATALOG.find(item=>item.key===key)
   if(!meta || meta.group!=="基础数字化库") return null
   const specs:Record<string,StandardLibrarySpec>={
-    std_person:{code:"5011001001100001001",identity:"5013001001100001",libraryId:"lib-standard-person",libraryName:"人员信息数字化库",fields:[
+    std_person:{code:"5011001001100001001",identity:"5013001001100001",libraryId:"lib-standard-person",libraryName:"员工信息数字化库",fields:[
       f("std-person-code","人员数字化编码","employeeCode","text",{digitalId:"5013001001002001",required:true,pattern:"^5011002[0-9]{4}$",placeholder:"11位员工数字化编码"}),
       f("std-person-name","人员姓名","personName","text",{digitalId:"5013001001002002",required:true}),
       f("std-person-account","人员账号","username","text",{digitalId:"5013001001002003"}),
-      libraryField("std-person-dept","所属部门","department","5013001001002004","lib-standard-dept","部门信息数字化库","5013001001003001"),
+      libraryField("std-person-dept","所属部门","department","5013001001002004","lib-standard-dept","组织名称数字化库","5013001001003001"),
       f("std-person-role","身份/角色","roleName","text",{digitalId:"5013001001002005"}),
       f("std-person-enabled","是否启用","enabled","boolean",{digitalId:"5013001001002006",required:true,defaultValue:true}),
-      libraryField("std-person-rank","组织职级","organizationRank","5013001001002007","lib-standard-org-rank","组织职级数字化库","5013001001110154",{required:false}),
+      libraryField("std-person-rank","组织职级","organizationRank","5013001001002007","lib-standard-org-rank","组织数字化库","5013001001110154",{required:false}),
       libraryMultiField("std-person-business","业务领域","businessDomains","5013001001002008","lib-standard-business-definition","业务定义数字化库","5013001001006002",{required:false}),
       f("std-person-title","身份说明","identityTitle","text",{digitalId:"5013001001002009"}),
       libraryMultiField("std-person-models","可使用模型","usableModels","5013001001002010","lib-standard-model","模型信息数字化库","5013001001005001",{required:false}),
     ],outputKeys:["employeeCode","personName","username","department","roleName","enabled","organizationRank","businessDomains","identityTitle","usableModels"]},
-    std_department:{code:"5011001001100002001",identity:"5013001001100002",libraryId:"lib-standard-dept",libraryName:"部门信息数字化库",fields:[
+    std_department:{code:"5011001001100002001",identity:"5013001001100002",libraryId:"lib-standard-dept",libraryName:"组织名称数字化库",fields:[
       f("std-dept-name","部门名称","departmentName","text",{digitalId:"5013001001003001",required:true}),
-      libraryField("std-dept-parent","上级部门","parentDepartment","5013001001003002","lib-standard-dept","部门信息数字化库","5013001001003001",{required:false}),
+      libraryField("std-dept-parent","上级部门","parentDepartment","5013001001003002","lib-standard-dept","组织名称数字化库","5013001001003001",{required:false}),
       f("std-dept-enabled","是否启用","enabled","boolean",{digitalId:"5013001001003003",required:true,defaultValue:true}),
       libraryField("std-dept-nature","组织性质","organizationNature","5013001001110703","lib-standard-org-nature","组织性质数字化库","5013001001110702",{required:false}),
     ],outputKeys:["departmentName","parentDepartment","enabled","organizationNature"]},
@@ -248,13 +248,13 @@ function standardLibraryTemplate(key:TemplateKey):TemplatePreset|null {
     std_meeting_room:{code:"5011001001100016001",identity:"5013001001100016",libraryId:"lib-standard-meeting-room",libraryName:"会议室数字化库",fields:[f("std-mr-code","会议室编码","meetingRoomCode","text",{digitalId:"5013001001110121",required:true}),f("std-mr-name","会议室名称","meetingRoomName","text",{digitalId:"5013001001110122",required:true}),f("std-mr-cap","容纳人数","capacity","number",{digitalId:"5013001001110123"})],outputKeys:["meetingRoomCode","meetingRoomName","capacity"]},
     std_review_opinion:{code:"5011001001100017001",identity:"5013001001100017",libraryId:"lib-standard-review-opinion",libraryName:"议题审定意见数字化库",fields:[f("std-ro-code","审定意见码","reviewOpinionCode","text",{digitalId:"5013001001110131",required:true}),f("std-ro-name","审定意见","reviewOpinionName","text",{digitalId:"5013001001110132",required:true})],outputKeys:["reviewOpinionCode","reviewOpinionName"]},
     std_yes_no:{code:"5011001001100018001",identity:"5013001001100018",libraryId:"lib-standard-yes-no",libraryName:"是否数字化库",fields:[f("std-yn-code","数字化值码","valueCode","text",{digitalId:"5013001001110141",required:true}),f("std-yn-name","数字化值","valueName","text",{digitalId:"5013001001110142",required:true})],outputKeys:["valueCode","valueName"]},
-    std_org_rank:{code:"5011001001100020001",identity:"5013001001100020",libraryId:"lib-standard-org-rank",libraryName:"组织职级数字化库",fields:[
+    std_org_rank:{code:"5011001001100020001",identity:"5013001001100020",libraryId:"lib-standard-org-rank",libraryName:"组织数字化库",fields:[
       libraryField("std-or-nature","组织性质","organizationNature","5013001001110151","lib-standard-org-nature","组织性质数字化库","5013001001110072"),
       f("std-or-level","组织层级码","organizationLevelCode","text",{digitalId:"5013001001110152",required:true}),
       f("std-or-rank","职级码","rankCode","text",{digitalId:"5013001001110153",required:true}),
       f("std-or-name","职级含义","rankName","text",{digitalId:"5013001001110154",required:true}),
     ],outputKeys:["organizationNature","organizationLevelCode","rankCode","rankName"]},
-    std_threshold_type:{code:"5011001001100021001",identity:"5013001001100021",libraryId:"lib-standard-threshold-type",libraryName:"阈值类型数字化库",fields:[f("std-th-code","阈值类型码","thresholdTypeCode","text",{digitalId:"5013001001110161",required:true}),f("std-th-name","阈值类型","thresholdTypeName","text",{digitalId:"5013001001110162",required:true})],outputKeys:["thresholdTypeCode","thresholdTypeName"]},
+    std_threshold_type:{code:"5011001001100021001",identity:"5013001001100021",libraryId:"lib-standard-threshold-type",libraryName:"阈值类属数字化库",fields:[f("std-th-code","阈值类型码","thresholdTypeCode","text",{digitalId:"5013001001110161",required:true}),f("std-th-name","阈值类型","thresholdTypeName","text",{digitalId:"5013001001110162",required:true})],outputKeys:["thresholdTypeCode","thresholdTypeName"]},
     std_model_timeout:{code:"5011001001100022001",identity:"5013001001100022",libraryId:"lib-standard-model-timeout",libraryName:"模型时限数字化库",fields:[f("std-time-hours","模型时限（小时）","timeoutHours","number",{digitalId:"5013001001110171",required:true,min:1}),libraryMultiField("std-time-biz","适用业务范围","businessDomains","5013001001110172","lib-standard-business-definition","业务定义数字化库","5013001001006002")],outputKeys:["timeoutHours","businessDomains"]},
   }
   const spec=specs[key]
@@ -269,7 +269,7 @@ function controlConfigTemplate(key:TemplateKey):TemplatePreset|null {
   const meta=MODEL_TEMPLATE_CATALOG.find(item=>item.key===key)
   if(!meta || meta.group!=="审批智选配置") return null
   const specs:Record<string,{code:string;identity:string;libraryName:string;fields:Field[];outputs:string[];modelType?:string}>={
-    config_digital:{code:"5011001001200001001",identity:"5013001001200001",libraryName:"数字化配置数字化库",fields:[
+    config_digital:{code:"5011001001200001001",identity:"5013001001200001",libraryName:"模型数字化配置数字化库",fields:[
       libraryField("cfg-d-model","数字化编码对象","targetModelName","5013001001210001","lib-standard-model","模型信息数字化库","5013001001005001"),
       f("cfg-d-code","模型数字化编码","targetModelCode","text",{digitalId:"5013001001210002",readonly:true,sourceMode:"library_fill",linkage:{sourceLibraryId:"lib-standard-model",sourceLibrary:"模型信息数字化库",triggerFieldKey:"targetModelName",matchDigitalId:"5013001001005001",sourceDigitalId:"5013001001005003",mode:"fill"}}),
       libraryMultiField("cfg-d-attr","数字化属性集合","digitalAttributes","5013001001210003","lib-standard-attribute-definition","数字化属性定义数字化库","5013001001110052"),
@@ -277,7 +277,7 @@ function controlConfigTemplate(key:TemplateKey):TemplatePreset|null {
     ],outputs:["targetModelName","targetModelCode","digitalAttributes","digitalIdentifiers"]},
     config_digital_display:{code:"5011001001200002001",identity:"5013001001200002",libraryName:"数字化展示结果库",fields:[
       f("cfg-show-user","当前操作者","operatorName","user",{digitalId:"5013001001210011",sourceMode:"current_user",readonly:true}),
-      f("cfg-show-dept","操作者部门","operatorDepartment","department",{digitalId:"5013001001210012",sourceMode:"library_fill",readonly:true,linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",triggerFieldKey:"operatorName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
+      f("cfg-show-dept","操作者部门","operatorDepartment","department",{digitalId:"5013001001210012",sourceMode:"library_fill",readonly:true,linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"员工信息数字化库",triggerFieldKey:"operatorName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
       libraryMultiField("cfg-show-code","数字化编码展示集","digitalCodes","5013001001210013","lib-standard-model","模型信息数字化库","5013001001005001"),
       libraryMultiField("cfg-show-attr","数字化属性展示集","digitalAttributes","5013001001210014","lib-standard-attribute-definition","数字化属性定义数字化库","5013001001110052"),
       libraryMultiField("cfg-show-id","数字化标识展示集","digitalIdentifiers","5013001001210015","lib-standard-identifier","数字化标识数字化库","5013001001008002"),
@@ -292,29 +292,29 @@ function controlConfigTemplate(key:TemplateKey):TemplatePreset|null {
     ],outputs:["businessName","businessApprovalLevel"]},
     config_position:{code:"5011001001200005001",identity:"5013001001200005",libraryName:"岗位分选数字化库",fields:[
       libraryField("cfg-pos-biz","业务事项","businessName","5013001001210301","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
-      libraryField("cfg-pos-use","使用岗","usePerson","5013001001210302","lib-standard-person","人员信息数字化库","5013001001002002"),
-      libraryField("cfg-pos-review","审查岗","reviewPerson","5013001001210303","lib-standard-person","人员信息数字化库","5013001001002002"),
-      libraryField("cfg-pos-manage","管理岗","managePerson","5013001001210304","lib-standard-person","人员信息数字化库","5013001001002002"),
+      libraryField("cfg-pos-use","使用岗","usePerson","5013001001210302","lib-standard-person","员工信息数字化库","5013001001002002"),
+      libraryField("cfg-pos-review","审查岗","reviewPerson","5013001001210303","lib-standard-person","员工信息数字化库","5013001001002002"),
+      libraryField("cfg-pos-manage","管理岗","managePerson","5013001001210304","lib-standard-person","员工信息数字化库","5013001001002002"),
     ],outputs:["businessName","usePerson","reviewPerson","managePerson"]},
-    config_identifier_trigger:{code:"5011001001200006001",identity:"5013001001200006",libraryName:"标识触发配置数字化库",fields:[
+    config_identifier_trigger:{code:"5011001001200006001",identity:"5013001001200006",libraryName:"标识关联配置数字化库",fields:[
       libraryField("cfg-tr-id","业务数字化标识","sourceDigitalIdentifier","5013001001210401","lib-standard-identifier","数字化标识数字化库","5013001001008001"),
       libraryField("cfg-tr-model","关联目标模型","targetModelName","5013001001210402","lib-standard-model","模型信息数字化库","5013001001005001"),
       f("cfg-tr-enabled","是否启用","enabled","boolean",{digitalId:"5013001001210403",required:true,defaultValue:true}),
     ],outputs:["sourceDigitalIdentifier","targetModelName","enabled"]},
-    config_business_ownership:{code:"5011001001200007001",identity:"5013001001200007",libraryName:"业务归属配置数字化库",fields:[
-      libraryField("cfg-bo-dept","组织/部门","departmentName","5013001001210501","lib-standard-dept","部门信息数字化库","5013001001003001"),
+    config_business_ownership:{code:"5011001001200007001",identity:"5013001001200007",libraryName:"业务归属数字化库",fields:[
+      libraryField("cfg-bo-dept","组织/部门","departmentName","5013001001210501","lib-standard-dept","组织名称数字化库","5013001001003001"),
       libraryMultiField("cfg-bo-biz","业务领域集合","businessDomains","5013001001210502","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       f("cfg-bo-desc","业务归属说明","ownershipDescription","textarea",{digitalId:"5013001001210503",width:12}),
     ],outputs:["departmentName","businessDomains","ownershipDescription"]},
     config_approval_assignment:{code:"5011001001200008001",identity:"5013001001200008",libraryName:"审批分管配置数字化库",fields:[
-      libraryField("cfg-as-rank","组织职级","organizationRank","5013001001210601","lib-standard-org-rank","组织职级数字化库","5013001001110154"),
+      libraryField("cfg-as-rank","组织职级","organizationRank","5013001001210601","lib-standard-org-rank","组织数字化库","5013001001110154"),
       libraryMultiField("cfg-as-admin","行政审批分管业务","administrativeBusinessDomains","5013001001210602","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryMultiField("cfg-as-biz","业务审批分管业务","businessApprovalDomains","5013001001210603","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
-      libraryField("cfg-as-ath","行政阈值类型","administrativeThresholdType","5013001001210604","lib-standard-threshold-type","阈值类型数字化库","5013001001110162",{required:false}),
-      libraryField("cfg-as-bth","业务阈值类型","businessThresholdType","5013001001210605","lib-standard-threshold-type","阈值类型数字化库","5013001001110162",{required:false}),
+      libraryField("cfg-as-ath","行政阈值类型","administrativeThresholdType","5013001001210604","lib-standard-threshold-type","阈值类属数字化库","5013001001110162",{required:false}),
+      libraryField("cfg-as-bth","业务阈值类型","businessThresholdType","5013001001210605","lib-standard-threshold-type","阈值类属数字化库","5013001001110162",{required:false}),
     ],outputs:["organizationRank","administrativeBusinessDomains","businessApprovalDomains","administrativeThresholdType","businessThresholdType"]},
     config_threshold:{code:"5011001001200009001",identity:"5013001001200009",libraryName:"审批阈值配置数字化库",fields:[
-      libraryField("cfg-th-type","阈值类型","thresholdType","5013001001210701","lib-standard-threshold-type","阈值类型数字化库","5013001001110162"),
+      libraryField("cfg-th-type","阈值类型","thresholdType","5013001001210701","lib-standard-threshold-type","阈值类属数字化库","5013001001110162"),
       libraryField("cfg-th-id","对应数字化标识","thresholdDigitalIdentifier","5013001001210702","lib-standard-identifier","数字化标识数字化库","5013001001008001"),
       f("cfg-th-value","阈值值","thresholdValue","number",{digitalId:"5013001001210703",required:true}),
       libraryField("cfg-th-rank","对应审批层级","approvalLevel","5013001001210704","lib-standard-admin-approval-level","行政审批层级数字化库","5013001001110082"),
@@ -368,9 +368,9 @@ function systemBuildTemplate(key: TemplateKey): TemplatePreset | null {
       f("dmc-domain","业务领域","businessDomain","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-business-definition",sourceLibrary:"业务定义数字化库",sourceDigitalId:"5013001001006002",mode:"options"}}),
     ],outputs:["targetModelName","modelDigitalCode","businessDomain"]},
     digital_person_code:{code:"5011001001001004001",identity:"5013001001001004",fields:[
-      f("dpc-person","选择人员","personName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",sourceDigitalId:"5013001001002002",mode:"options"}}),
+      f("dpc-person","选择人员","personName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"员工信息数字化库",sourceDigitalId:"5013001001002002",mode:"options"}}),
       f("dpc-code","人员数字化编码","personDigitalCode","text",{required:true,pattern:"^5011002[0-9]{4}$",placeholder:"11位员工数字化编码"}),
-      f("dpc-dept","所属部门","department","department",{readonly:true,sourceMode:"library_fill",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",triggerFieldKey:"personName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
+      f("dpc-dept","所属部门","department","department",{readonly:true,sourceMode:"library_fill",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"员工信息数字化库",triggerFieldKey:"personName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
     ],outputs:["personName","personDigitalCode","department"]},
     digital_attribute:{code:"5011001001001005001",identity:"5013001001001005",fields:[
       libraryField("dac-type","对象类型","objectType",stableFieldDigitalId("dac-type:objectType"),"lib-standard-object-type","数字化对象类型数字化库","5013001001110042"),
@@ -424,7 +424,7 @@ function meetingTemplate(key: Exclude<TemplateKey,"blank"|"leave"|"approval"|"sm
     return {suggestion:common("对编组中的每个议题分别形成一对一审定实例和审定结果。","由智选触发；每个实例只审定一个议题。"),design:baseDesign(fields,list,[standard("mr-s1","审定单一议题","智选启动数字化标识、编组文件名、议题序号","读取对应议题并形成审定结果","一对一审定","审定议题、审定结果","生成文件名、模型结果并入会议议题审定数字化库")],["groupFileName","sequence","topic","reviewResult"]),testData:{cases:[{id:"mr-c1",name:"单议题审定通过",input:{groupFileName:"5011001006001003-50110020015-20260908140000",sequence:1,topic:"事项A",reviewResult:"同意上会"},expectValid:true,expectedOutput:{reviewResult:"同意上会"}}]},configuration:businessConfig(item.name,"5011001006001004","5013001006001004",item.startModes)}
   }
   if(key==="meeting_organize"){
-    const fields=[libraryField("mo-type","会议类型","meetingType",stableFieldDigitalId("mo-type:meetingType"),"lib-standard-meeting-type","会议类型数字化库","5013001001110112"),f("mo-items","审定通过议题","approvedTopics","subform",{width:12,required:true,subFields:[{id:"mo-si1",label:"议题",key:"topic",type:"text",required:true},{id:"mo-si2",label:"汇报人",key:"reporter",type:"user"}]}),libraryField("mo-host","会议主持人","host",stableFieldDigitalId("mo-host:host"),"lib-standard-person","人员信息数字化库","5013001001002002"),libraryMultiField("mo-att","会议出席人员","attendees",stableFieldDigitalId("mo-att:attendees"),"lib-standard-person","人员信息数字化库","5013001001002002",{width:12}),f("mo-time","会议时间","meetingTime","text",{required:true}),libraryField("mo-room","会议室","meetingRoom",stableFieldDigitalId("mo-room:meetingRoom"),"lib-standard-meeting-room","会议室数字化库","5013001001110122")]
+    const fields=[libraryField("mo-type","会议类型","meetingType",stableFieldDigitalId("mo-type:meetingType"),"lib-standard-meeting-type","会议类型数字化库","5013001001110112"),f("mo-items","审定通过议题","approvedTopics","subform",{width:12,required:true,subFields:[{id:"mo-si1",label:"议题",key:"topic",type:"text",required:true},{id:"mo-si2",label:"汇报人",key:"reporter",type:"user"}]}),libraryField("mo-host","会议主持人","host",stableFieldDigitalId("mo-host:host"),"lib-standard-person","员工信息数字化库","5013001001002002"),libraryMultiField("mo-att","会议出席人员","attendees",stableFieldDigitalId("mo-att:attendees"),"lib-standard-person","员工信息数字化库","5013001001002002",{width:12}),f("mo-time","会议时间","meetingTime","text",{required:true}),libraryField("mo-room","会议室","meetingRoom",stableFieldDigitalId("mo-room:meetingRoom"),"lib-standard-meeting-room","会议室数字化库","5013001001110122")]
     const list=nodes([["mo-read","read","读取会议议题编组与审定结果","仅取审定通过议题"],["mo-input","interaction","会议组织交互","选择会议时间、会议室、主持人、出席人员"],["mo-calc","calculation","匹配会议室与汇报人","读取会议室数字化库和员工信息库"],["mo-output","output","会议组织归档","生成会议组织结果并入库"]])
     return {suggestion:common("形成可执行的会议组织数据，包括审定通过议题、时间、会议室、主持人、参会人员和汇报人。","支持定时、定量或人工启动；只组织审定通过的议题。"),design:baseDesign(fields,list,[standard("mo-s1","","启动数字化标识、会议类型、会议议题编组库","按会议类型读取审定通过的审议事项","确定会议类型与议题集合","会议类型、审议事项",""),standard("mo-s2","选择会议时间、会议室","会议主持人、出席人员、会议室数字化库、员工信息库","匹配可用会议室并读取汇报人","会议组织","会议时间、会议室、主持人、出席人员、汇报人","生成文件名、模型结果并入会议组织数字化库")],["meetingType","approvedTopics","host","attendees","meetingTime","meetingRoom"]),testData:{cases:[{id:"mo-c1",name:"组织1项议题",input:{meetingType:"董事长专题会",approvedTopics:[{topic:"事项A",reporter:"张珊"}],host:"张珊",attendees:"参会人员A",meetingTime:"2026-09-10 09:00",meetingRoom:"第一会议室"},expectValid:true,expectedOutput:{meetingRoom:"第一会议室"}}]},configuration:businessConfig(item.name,"5011001006001001002","5013001006001005",item.startModes)}
   }

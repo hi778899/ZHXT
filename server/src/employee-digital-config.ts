@@ -1,5 +1,6 @@
 import { query } from "./db.js"
 import { isCurrentEmployeeDigitalCode, nextEmployeeDigitalCode } from "./digital-codes.js"
+import { upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
 
 type UserRow={id:string;username:string;display_name:string;department:string;employee_code:string;role:string;status:string}
 type RecordRow={id:string;digital_id:string;data:Record<string,unknown>}
@@ -31,9 +32,10 @@ async function ensureCurrentEmployeeCode(user:UserRow){
 
 async function hasFormal0622EmployeeRecord(employeeCode:string,displayName:string){
   const result=await query<{id:string}>(`SELECT id FROM digital_library_records
-    WHERE library_id='lib-standard-person' AND data->>'数据版本'='0622' AND id LIKE 'src0622-%'
+    WHERE library_id='lib-standard-person' AND data->>'数据版本'='0622'
+      AND COALESCE(data->>'数据来源','') NOT LIKE '系统账号同步%'
       AND ((data->>'员工数字化编码')=$1 OR (data->>'员工姓名')=$2)
-    ORDER BY CASE WHEN id LIKE 'src0622-%' THEN 0 ELSE 1 END,created_at,id LIMIT 1`,[employeeCode,displayName])
+    ORDER BY created_at,id LIMIT 1`,[employeeCode,displayName])
   return Boolean(result.rows[0]?.id)
 }
 
@@ -71,14 +73,9 @@ export async function ensureEmployeeApprovalDigitalConfig(userId:string){
     "员工数字化编码":employeeCode,"员工姓名":user.display_name,"组织数字化属性":orgAttr,"组织名称数字化属性":orgNameAttr,
     "业务领域":businessDomains.join("；"),"身份":identity,"数据版本":"0622","数据来源":"系统账号同步形成员工信息数字化配置；审批模型正式读取员工信息数字化库"
   }
-  await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data)
-    SELECT $1,l.model_id,NULL,NULL,$2,l.name,$3,l.id,'{}'::jsonb,$4::jsonb FROM digital_libraries l WHERE l.id='lib-standard-person'
-    ON CONFLICT(id) DO UPDATE SET owner_id=EXCLUDED.owner_id,library_name=EXCLUDED.library_name,digital_id=EXCLUDED.digital_id,data=EXCLUDED.data`,
-    [`auto0622-person-${user.id}`,user.id,employeeCode,JSON.stringify(data)])
-  await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data)
-    SELECT $1,l.model_id,NULL,NULL,$2,l.name,$3,l.id,'{}'::jsonb,$4::jsonb FROM digital_libraries l WHERE l.id='lib-digital-employee-code-0622'
-    ON CONFLICT(id) DO UPDATE SET owner_id=EXCLUDED.owner_id,library_name=EXCLUDED.library_name,digital_id=EXCLUDED.digital_id,data=EXCLUDED.data`,
-    [`auto0622-employee-${user.id}`,user.id,employeeCode,JSON.stringify({"员工数字化编码":employeeCode,"员工姓名":user.display_name,"数据版本":"0622","数据来源":"系统账号同步形成员工数字化编码记录"})])
+  await upsertSystemDigitalLibraryRecord({recordId:`auto0622-person-${user.id}`,libraryId:'lib-standard-person',ownerId:user.id,digitalId:employeeCode,identifierValues:{},data,source:'system_employee_approval_config_sync'})
+  await upsertSystemDigitalLibraryRecord({recordId:`auto0622-employee-${user.id}`,libraryId:'lib-digital-employee-code-0622',ownerId:user.id,digitalId:employeeCode,identifierValues:{},
+    data:{"员工数字化编码":employeeCode,"员工姓名":user.display_name,"数据版本":"0622","数据来源":"系统账号同步形成员工数字化编码记录"},source:'system_employee_code_sync'})
   return {configured:true,employeeCode,source:"synchronized",organizationDigitalAttribute:orgAttr,organizationNameDigitalAttribute:orgNameAttr}
 }
 

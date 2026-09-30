@@ -65,3 +65,12 @@
 2. 文件名 CHECK 约束必须在历史记录迁移、异常标记之后建立；`NOT VALID` 仍会约束建立之后的 INSERT/UPDATE，不得将其误认为不会校验后续更新。
 3. 无法安全映射的历史记录必须先写入 `legacy_file_name` 与迁移异常清单；约束允许该原始历史行继续被查询和维护，但不得用于形成新的跨模型运行关系。
 4. 新插入或新生成的模型运行不得利用 `legacy_file_name` 绕过当前文件名规则。
+
+## 7. V17.7.14 历史数字化库记录模型运行物化
+
+升级时必须扫描全部 `digital_library_records.run_id IS NULL` 的历史记录。对能够安全确定数据产生模型、当前19位模型数字化编码和当前11位运行人员员工数字化编码的记录，使用原 `created_at` 形成 `system_initialization` 运行，并一次性回填 `run_id`、标准 `file_name`、显示文件名和运行来源。
+
+不能安全物化的记录进入 `digital_library_run_materialization_issues`；不得猜测绑定模型或人员。`migration_pending` 仅作为迁移暂存状态，待 seed 发布/补齐数据产生模型后必须自动重试物化。
+
+数据库必须设置写入约束：正常新增/更新的正式数字化库记录若 `run_id` 为空，写入失败；具有 `run_id` 时其标准文件名必须符合当前格式。迁移完成后 `std-*` 等历史主键只允许保存在 `legacy_record_id` 审计字段。
+
