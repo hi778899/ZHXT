@@ -1,3 +1,13 @@
+# V17.7.18 审批完整路径完成规则
+
+- 全系统审批模型完成判定以合并、去重后的 `Path_final` 为唯一依据。
+- 行政审批、技术审查、业务审查任一子路径单独完成不得提前归档。
+- 员工请休假标准链路：员工发起 → 部门经理审批 → 考勤主管业务审查 → 审批归档 → 智选。
+- 部门经理同意后必须继续产生考勤主管待办；只有 `Path_final` 正常执行完或命中正式终止规则后才允许归档。
+- 审批归档后仍按系统固定链路触发智选。
+
+---
+
 # AGENTS.md
 
 ## 0. 仓库标准路径
@@ -25,7 +35,7 @@
 
 涉及模型、数字化库、审批、智选时，必须同时阅读 `.ai/rules/02_ONE_MODEL_ONE_LIBRARY_RULES.md` 至 `.ai/rules/08_RUNTIME_ENGINE_RULES.md`，以及 `.ai/rules/16_MODEL_DIGITAL_CODE_FILENAME_RULES.md`。
 
-涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md` 与 `.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
+涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`、`.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md` 与 `.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
 
 ## 3. 不可违反的红线
 

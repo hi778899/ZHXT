@@ -293,27 +293,27 @@ export async function resolveApprovalPlan0622(params:{
     for (const candidate of candidates) addStep(candidate,"administrative","行政审批",{"组织路径序号":orgIndex+1,"组织关系":orgIndex===0?"申请人所在组织":"进入上级/分管组织后重新计算"})
   }
 
-  // 技术复核：优先从业务审核岗/副职形成复核分支，再在本组织/上级组织匹配负责人。
+  // 技术/业务审查：只把“审批分管配置数字化库”中明确配置为技术/业务审查职责、
+  // 且员工信息数字化库实际存在的人员形成 Path_review 节点。
+  // 不再从一个审查人员自动追加其本组织负责人/上级负责人；若需要二级、三级审查，
+  // 必须由对应组织数字化属性在技术复核分管配置中分别形成真实审查人员。
+  // 这样行政审批 Path_admin 完成后不会被误判为整条 Path_final 完成，也不会把行政负责人重复拼入审查路径。
+  const reviewRolePattern=/审核|审查|复核|业务审核|专业审核|专业审查|副职/
+  const orgOrder=new Map(organizationPath.map((code,index)=>[code,index]))
   const technicalSeeds=allPlacements.filter(item=>{
     const assignment=activeTech.find(rule=>rule.orgAttr===item.orgAttr)
     if (!assignment || item.employeeCode===applicant.employeeCode || !businessMatches(item.domains,hierarchy)) return false
-    return /审核|复核|副职/.test(assignment.rankName)
+    return reviewRolePattern.test(`${assignment.rankName} ${item.roleName} ${item.identity}`)
+  }).sort((a,b)=>{
+    const ao=orgOrder.get(a.orgNameAttr) ?? Number.MAX_SAFE_INTEGER
+    const bo=orgOrder.get(b.orgNameAttr) ?? Number.MAX_SAFE_INTEGER
+    return ao-bo || b.rank-a.rank || a.employeeCode.localeCompare(b.employeeCode)
   })
   const techBranches:Array<Record<string,unknown>>=[]
   for (const seed of technicalSeeds) {
-    const branch:Placement[]=[seed]
-    let org=seed.orgNameAttr; const seen=new Set<string>()
-    while (org && !seen.has(org) && branch.length<6) {
-      seen.add(org)
-      const managers=allPlacements.filter(item=>item.orgNameAttr===org && item.employeeCode!==seed.employeeCode && activeTech.some(rule=>rule.orgAttr===item.orgAttr) && businessMatches(item.domains,hierarchy)).sort((a,b)=>a.rank-b.rank)
-      if (managers[0]) branch.push(managers[0])
-      org=rels.find(rel=>rel.child===org)?.parent ?? ""
-    }
-    const branchSteps:Runtime0622Step[]=[]
-    for (const person of branch) {
-      const before=steps.length; addStep(person,"technical",technicalSeeds.length>1?"技术复核会签":"技术复核",{"复核发起人":seed.name,"复核分支":technicalSeeds.length>1?seed.name:"单一技术复核"})
-      if (steps.length>before) branchSteps.push(steps[steps.length-1])
-    }
+    const before=steps.length
+    addStep(seed,"technical",technicalSeeds.length>1?"技术/业务审查":"技术/业务审查",{"复核发起人":seed.name,"复核分支":technicalSeeds.length>1?seed.name:"单一技术/业务审查","路径规则":"技术/业务审查人员必须由审批分管配置与员工信息数字化库直接形成，不自动追加行政负责人"})
+    const branchSteps=steps.length>before ? [steps[steps.length-1]] : []
     techBranches.push({"复核发起人":seed.name,"复核路径":branchSteps.map(item=>`${item.organizationName}·${item.userName}`)})
   }
 

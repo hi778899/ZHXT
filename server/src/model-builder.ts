@@ -1686,6 +1686,12 @@ export async function runPublishedModel(user: BuilderUser, modelName: string, in
     }
     const stepDefs = approvalStepDefinitions(row, execution.output)
     if (!stepDefs.length) throw new ModelBuilderError(409, "审批模型未形成有效审批路径，请检查审批层级、阈值、分管和岗位数字化库")
+    // Path_final 在审批首次计算完成后固化为本次运行的必经节点快照；后续办理只能推进，不能因子路径完成而缩短。
+    execution.output.approvalFinalPathSteps=stepDefs.map((item,index)=>({index,id:item.id,title:item.title,approvalType:item.approvalType ?? "administrative",userName:item.userName ?? "",roleLabel:item.roleLabel ?? ""}))
+    execution.output.approvalFinalPathTotalSteps=stepDefs.length
+    execution.output.approvalFinalPathCompletedSteps=0
+    execution.output.approvalFinalPathRemainingSteps=stepDefs.length
+    execution.output.approvalFinalPathComplete=false
     const firstStep = stepDefs[0]
     const ownerId = await resolveApprovalOwner(firstStep, input, user.id)
     const approver=await query<{display_name:string}>("SELECT display_name FROM users WHERE id=$1 LIMIT 1",[ownerId])
@@ -1756,33 +1762,57 @@ export async function handleModelTodo(user: BuilderUser, todoId: string, resultN
 
   const input = plainObject(current.input_data)
   const stepDefs = approvalStepDefinitions(projectRow, output)
+  if (!stepDefs.length) throw new ModelBuilderError(409, "审批模型未形成完整最终审批路径，不能办理或归档")
   const stepIndex = Number(current.step_index ?? 0)
   const approvalProcess = await approvalProcessForRun(current.run_id)
 
-  if (!explicitTerminal && resultName === "同意" && stepIndex + 1 < stepDefs.length) {
-    const nextIndex = stepIndex + 1
-    const ownerId = await resolveApprovalOwner(stepDefs[nextIndex], input, String(current.run_owner_id ?? user.id))
+  // V17.7.19：审批模型完成判定只认完整 Path_final。
+  // 行政审批子路径、技术审查子路径、业务审查子路径任一单独完成，都不得提前归档。
+  // 当前待办办理完成后，以本次审批运行已经完成的 step_index 集合重新判断下一必经节点，
+  // 而不是用“当前行政审批已到目标层级”推断整条审批已经结束。
+  const progressRows=await query<{id:string;owner_id:string;step_index:number;status:string;handled_result:string|null}>(
+    "SELECT id,owner_id,step_index,status,handled_result FROM todos WHERE run_id=$1 AND model=$2 ORDER BY step_index,created_at",
+    [current.run_id,current.model]
+  )
+  const completedIndexes=new Set(progressRows.rows
+    .filter(item=>["已完成","已退回"].includes(String(item.status)) && String(item.handled_result ?? "").trim())
+    .map(item=>Number(item.step_index ?? -1)))
+  const requiredIndexes=stepDefs.map((_,index)=>index)
+  const nextRequiredIndex=requiredIndexes.find(index=>!completedIndexes.has(index))
+
+  if (!explicitTerminal && resultName === "同意" && nextRequiredIndex !== undefined) {
+    if (nextRequiredIndex <= stepIndex) throw new ModelBuilderError(409, `最终审批路径执行状态异常：第${nextRequiredIndex+1}环节尚未完成，禁止提前归档`)
+    const ownerId = await resolveApprovalOwner(stepDefs[nextRequiredIndex], input, String(current.run_owner_id ?? user.id))
     const approver=await query<{display_name:string}>("SELECT display_name FROM users WHERE id=$1 LIMIT 1",[ownerId])
     const nextOutput:Record<string,unknown>={
       ...output,
       approvalTotalSteps:stepDefs.length,
-      approvalCurrentStep:nextIndex+1,
-      approvalCurrentApprover:approver.rows[0]?.display_name ?? stepDefs[nextIndex].roleLabel ?? stepDefs[nextIndex].title,
+      approvalCurrentStep:nextRequiredIndex+1,
+      approvalCurrentApprover:approver.rows[0]?.display_name ?? stepDefs[nextRequiredIndex].roleLabel ?? stepDefs[nextRequiredIndex].title,
       approvalOpinion:resultName,
       approvalTime:new Date().toISOString(),
       approvalProcess,
       approvalStatus:"审批中",
+      approvalFinalPathCompletedSteps:completedIndexes.size,
+      approvalFinalPathRemainingSteps:stepDefs.length-completedIndexes.size,
+      approvalFinalPathComplete:false,
       "审批总环节":stepDefs.length,
-      "当前审批环节":stepDefs[nextIndex].title,
-      "当前审批人":approver.rows[0]?.display_name ?? stepDefs[nextIndex].roleLabel ?? stepDefs[nextIndex].title,
+      "当前审批环节":stepDefs[nextRequiredIndex].title,
+      "当前审批人":approver.rows[0]?.display_name ?? stepDefs[nextRequiredIndex].roleLabel ?? stepDefs[nextRequiredIndex].title,
       "审批意见":resultName,
       "审批时间":new Date().toISOString(),
       "审批办理记录":approvalProcess,
       "审批状态":"审批中",
     }
     await query("UPDATE model_runs SET output_data=$1,status='审批中' WHERE id=$2",[JSON.stringify(nextOutput),current.run_id])
-    const todo = await createApprovalTodo(projectRow, current.run_id, ownerId, String(input.applicant ?? user.display_name), current.file_name, current.digital_id, input, nextOutput, nextIndex)
-    return { handled: true as const, completed: false, todo: ownerId === user.id ? todo : null, runId: current.run_id, output: nextOutput }
+    const existingNext=progressRows.rows.find(item=>Number(item.step_index)===nextRequiredIndex && !["已完成","已退回"].includes(String(item.status)))
+    let todo:RuntimeTodo|null=null
+    if (!existingNext) todo=await createApprovalTodo(projectRow, current.run_id, ownerId, String(input.applicant ?? user.display_name), current.file_name, current.digital_id, input, nextOutput, nextRequiredIndex)
+    return { handled: true as const, completed: false, todo: todo && ownerId === user.id ? todo : null, runId: current.run_id, output: nextOutput }
+  }
+
+  if (!explicitTerminal && resultName === "同意" && completedIndexes.size < stepDefs.length) {
+    throw new ModelBuilderError(409, `最终审批路径尚未全部完成：已完成${completedIndexes.size}/${stepDefs.length}个必经节点，禁止审批模型归档`)
   }
 
   const resultKey = String(settings.resultOutputKey ?? "审批结果")
@@ -1797,6 +1827,9 @@ export async function handleModelTodo(user: BuilderUser, todoId: string, resultN
     approvalOpinion:resultName,
     approvalTime:completedAt,
     approvalProcess,
+    approvalFinalPathCompletedSteps: explicitTerminal ? completedIndexes.size : stepDefs.length,
+    approvalFinalPathRemainingSteps: explicitTerminal ? Math.max(0,stepDefs.length-completedIndexes.size) : 0,
+    approvalFinalPathComplete: explicitTerminal ? false : true,
     approvalResultPdf:`${current.file_name}-审批结果.pdf`,
     "审批结果":resultName,
     "审批状态":resultName === "同意" ? "审批通过" : resultName === "不同意" ? "审批不通过" : resultName === "退回修改" ? "退回修改" : resultName,

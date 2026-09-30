@@ -7,7 +7,7 @@ const builder = fs.readFileSync(new URL('../server/src/model-builder.ts', import
 const templates = fs.readFileSync(new URL('../server/src/model-templates.ts', import.meta.url), 'utf8')
 const relativeRules = fs.readFileSync(new URL('../.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md', import.meta.url), 'utf8')
 
-assert.match(relativeRules, /当前有效版本：V17\.7\.17/, '相对审批规则必须升级到 V17.7.17')
+assert.match(relativeRules, /当前有效版本：V17\.7\.(?:17|18|19)/, '相对审批规则版本不得低于 V17.7.17')
 assert.match(runtime, /相对审批\/审查级次/, '0622审批运行必须按相对级次计算')
 assert.match(runtime, /基础行政审批级次/, '审批内部必须形成基础行政审批级次')
 assert.match(runtime, /最终行政审批级次/, '审批内部必须形成最终行政审批级次')
