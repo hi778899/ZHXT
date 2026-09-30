@@ -1435,13 +1435,13 @@ async function applyDigitalAdministrationModel(modelName: string, input: Record<
 }
 
 async function assertCurrentRuntimeFile(runId: string, fileName: string) {
-  if (!isCurrentRuntimeFileName(fileName)) throw new ModelBuilderError(409,"当前运行仍使用旧模型文件名，必须先完成V17.7.11文件名迁移后才能继续办理或跨模型流转")
+  if (!isCurrentRuntimeFileName(fileName)) throw new ModelBuilderError(409,"当前运行仍使用旧模型文件名，必须先完成V17.7.12文件名迁移修复后才能继续办理或跨模型流转")
   try {
     const issue=await query<{reason:string}>("SELECT reason FROM model_file_name_migration_issues WHERE run_id=$1 AND resolved_at IS NULL LIMIT 1",[runId])
     if (issue.rows[0]?.reason) throw new ModelBuilderError(409,`当前运行的模型文件名迁移存在异常：${issue.rows[0].reason}`)
   } catch (error) {
     if (error instanceof ModelBuilderError) throw error
-    // 新库尚未执行V17.7.11迁移表时，仍以当前文件名格式作为硬校验。
+    // 新库尚未执行V17.7.12文件名迁移修复时，仍以当前文件名格式作为硬校验。
   }
 }
 

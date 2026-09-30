@@ -1,0 +1,11 @@
+import fs from "node:fs"; import assert from "node:assert/strict";
+const migration=fs.readFileSync("server/migrations/024_unify_runtime_filenames_current_structure.sql","utf8");
+const templates=fs.readFileSync("server/src/model-templates.ts","utf8");
+assert.match(migration,/builtin_model_code_migrations/);
+assert.match(migration,/old_model_code \|\| '001'/);
+const mark=migration.indexOf("UPDATE model_runs r SET legacy_file_name=COALESCE");
+const add=migration.indexOf("ADD CONSTRAINT model_runs_current_filename_check");
+assert.ok(mark>=0 && add>mark,"异常记录必须先标记 legacy_file_name，再增加 CHECK 约束");
+assert.match(migration,/legacy_file_name IS NOT NULL AND file_name=legacy_file_name/);
+assert.doesNotMatch(templates,/code:"5011001[0-9]{9}"/);
+console.log("V17.7.12 regression passed");

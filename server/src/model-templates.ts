@@ -204,7 +204,7 @@ function standardLibraryTemplate(key:TemplateKey):TemplatePreset|null {
   const meta=MODEL_TEMPLATE_CATALOG.find(item=>item.key===key)
   if(!meta || meta.group!=="基础数字化库") return null
   const specs:Record<string,StandardLibrarySpec>={
-    std_person:{code:"5011001001100001",identity:"5013001001100001",libraryId:"lib-standard-person",libraryName:"人员信息数字化库",fields:[
+    std_person:{code:"5011001001100001001",identity:"5013001001100001",libraryId:"lib-standard-person",libraryName:"人员信息数字化库",fields:[
       f("std-person-code","人员数字化编码","employeeCode","text",{digitalId:"5013001001002001",required:true,pattern:"^5011002[0-9]{4}$",placeholder:"11位员工数字化编码"}),
       f("std-person-name","人员姓名","personName","text",{digitalId:"5013001001002002",required:true}),
       f("std-person-account","人员账号","username","text",{digitalId:"5013001001002003"}),
@@ -216,46 +216,46 @@ function standardLibraryTemplate(key:TemplateKey):TemplatePreset|null {
       f("std-person-title","身份说明","identityTitle","text",{digitalId:"5013001001002009"}),
       libraryMultiField("std-person-models","可使用模型","usableModels","5013001001002010","lib-standard-model","模型信息数字化库","5013001001005001",{required:false}),
     ],outputKeys:["employeeCode","personName","username","department","roleName","enabled","organizationRank","businessDomains","identityTitle","usableModels"]},
-    std_department:{code:"5011001001100002",identity:"5013001001100002",libraryId:"lib-standard-dept",libraryName:"部门信息数字化库",fields:[
+    std_department:{code:"5011001001100002001",identity:"5013001001100002",libraryId:"lib-standard-dept",libraryName:"部门信息数字化库",fields:[
       f("std-dept-name","部门名称","departmentName","text",{digitalId:"5013001001003001",required:true}),
       libraryField("std-dept-parent","上级部门","parentDepartment","5013001001003002","lib-standard-dept","部门信息数字化库","5013001001003001",{required:false}),
       f("std-dept-enabled","是否启用","enabled","boolean",{digitalId:"5013001001003003",required:true,defaultValue:true}),
       libraryField("std-dept-nature","组织性质","organizationNature","5013001001110703","lib-standard-org-nature","组织性质数字化库","5013001001110702",{required:false}),
     ],outputKeys:["departmentName","parentDepartment","enabled","organizationNature"]},
-    std_leave_type:{code:"5011001001100003",identity:"5013001001100003",libraryId:"lib-standard-leave-type",libraryName:"请假类型数字化库",fields:[
+    std_leave_type:{code:"5011001001100003001",identity:"5013001001100003",libraryId:"lib-standard-leave-type",libraryName:"请假类型数字化库",fields:[
       f("std-leave-code","请假类型编码","leaveTypeCode","text",{digitalId:"5013001001004001",required:true}),
       f("std-leave-name","请假类型名称","leaveTypeName","text",{digitalId:"5013001001004002",required:true}),
       f("std-leave-enabled","是否启用","enabled","boolean",{digitalId:"5013001001004003",required:true,defaultValue:true}),
     ],outputKeys:["leaveTypeCode","leaveTypeName","enabled"]},
-    std_model_info:{code:"5011001001100019",identity:"5013001001100019",libraryId:"lib-standard-model",libraryName:"模型信息数字化库",fields:[
+    std_model_info:{code:"5011001001100019001",identity:"5013001001100019",libraryId:"lib-standard-model",libraryName:"模型信息数字化库",fields:[
       f("std-model-name","模型名称","modelName","text",{digitalId:"5013001001005001",required:true}),
       f("std-model-category","模型类别","modelCategory","text",{digitalId:"5013001001005002",required:true}),
       f("std-model-code","模型数字化编码","modelDigitalCode","text",{digitalId:"5013001001005003",required:true,pattern:"^(?:[0-9]{19}|[0-9]{16})$"}),
       f("std-model-status","模型状态","modelStatus","text",{digitalId:"5013001001005004",required:true,defaultValue:"已发布"}),
     ],outputKeys:["modelName","modelCategory","modelDigitalCode","modelStatus"]},
-    std_digital_type:{code:"5011001001100004",identity:"5013001001100004",libraryId:"lib-standard-digital-type",libraryName:"数字化类型数字化库",fields:[f("std-dt-code","类型码","typeCode","text",{digitalId:"5013001001110001",required:true,pattern:"^[0-9]$"}),f("std-dt-name","数字化类型","typeName","text",{digitalId:"5013001001110002",required:true})],outputKeys:["typeCode","typeName"]},
-    std_code_type:{code:"5011001001100005",identity:"5013001001100005",libraryId:"lib-standard-code-type",libraryName:"数字化编码类型数字化库",fields:[f("std-ct-code","编码类型码","codeTypeCode","text",{digitalId:"5013001001110011",required:true,pattern:"^[0-9]{3}$"}),f("std-ct-name","数字化编码类型","codeTypeName","text",{digitalId:"5013001001110012",required:true})],outputKeys:["codeTypeCode","codeTypeName"]},
-    std_business_level:{code:"5011001001100006",identity:"5013001001100006",libraryId:"lib-standard-business-level",libraryName:"业务层级数字化库",fields:[f("std-bl-code","业务层级码","businessLevelCode","text",{digitalId:"5013001001110021",required:true}),f("std-bl-name","业务层级","businessLevelName","text",{digitalId:"5013001001110022",required:true})],outputKeys:["businessLevelCode","businessLevelName"]},
-    std_definition_type:{code:"5011001001100007",identity:"5013001001100007",libraryId:"lib-standard-definition-type",libraryName:"数字化定义类型数字化库",fields:[f("std-def-code","定义类型码","definitionTypeCode","text",{digitalId:"5013001001110031",required:true}),f("std-def-name","定义类型","definitionTypeName","text",{digitalId:"5013001001110032",required:true})],outputKeys:["definitionTypeCode","definitionTypeName"]},
-    std_object_type:{code:"5011001001100008",identity:"5013001001100008",libraryId:"lib-standard-object-type",libraryName:"数字化对象类型数字化库",fields:[f("std-obj-code","对象类型码","objectTypeCode","text",{digitalId:"5013001001110041",required:true}),f("std-obj-name","对象类型","objectTypeName","text",{digitalId:"5013001001110042",required:true})],outputKeys:["objectTypeCode","objectTypeName"]},
-    std_attribute_definition:{code:"5011001001100009",identity:"5013001001100009",libraryId:"lib-standard-attribute-definition",libraryName:"数字化属性定义数字化库",fields:[f("std-attr-code","属性定义码","attributeCode","text",{digitalId:"5013001001110051",required:true}),f("std-attr-name","数字化属性名称","attributeName","text",{digitalId:"5013001001110052",required:true}),f("std-attr-desc","属性说明","attributeDescription","textarea",{digitalId:"5013001001110053",width:12})],outputKeys:["attributeCode","attributeName","attributeDescription"]},
-    std_data_type:{code:"5011001001100010",identity:"5013001001100010",libraryId:"lib-standard-data-type",libraryName:"数据类型数字化库",fields:[f("std-type-code","数据类型码","dataTypeCode","text",{digitalId:"5013001001110061",required:true}),f("std-type-name","数据类型","dataTypeName","text",{digitalId:"5013001001110062",required:true})],outputKeys:["dataTypeCode","dataTypeName"]},
-    std_org_nature:{code:"5011001001100011",identity:"5013001001100011",libraryId:"lib-standard-org-nature",libraryName:"组织性质数字化库",fields:[f("std-on-code","组织性质码","organizationNatureCode","text",{digitalId:"5013001001110071",required:true,pattern:"^[0-9]{2}$"}),f("std-on-name","组织性质","organizationNatureName","text",{digitalId:"5013001001110072",required:true})],outputKeys:["organizationNatureCode","organizationNatureName"]},
-    std_admin_approval_level:{code:"5011001001100012",identity:"5013001001100012",libraryId:"lib-standard-admin-approval-level",libraryName:"行政审批层级数字化库",fields:[f("std-aal-code","行政审批层级码","approvalLevelCode","number",{digitalId:"5013001001110081",required:true,min:0,max:999}),f("std-aal-name","行政审批层级","approvalLevelName","text",{digitalId:"5013001001110082",required:true})],outputKeys:["approvalLevelCode","approvalLevelName"]},
-    std_business_approval_level:{code:"5011001001100013",identity:"5013001001100013",libraryId:"lib-standard-business-approval-level",libraryName:"业务审批层级数字化库",fields:[f("std-bal-code","业务审批层级码","approvalLevelCode","number",{digitalId:"5013001001110091",required:true,min:0,max:999}),f("std-bal-name","业务审批层级","approvalLevelName","text",{digitalId:"5013001001110092",required:true})],outputKeys:["approvalLevelCode","approvalLevelName"]},
-    std_approval_opinion:{code:"5011001001100014",identity:"5013001001100014",libraryId:"lib-standard-approval-opinion",libraryName:"审批意见数字化库",fields:[f("std-op-code","审批意见码","opinionCode","text",{digitalId:"5013001001110101",required:true}),f("std-op-name","审批意见","opinionName","text",{digitalId:"5013001001110102",required:true}),f("std-op-terminal","是否终止","terminal","boolean",{digitalId:"5013001001110103",required:true})],outputKeys:["opinionCode","opinionName","terminal"]},
-    std_meeting_type:{code:"5011001001100015",identity:"5013001001100015",libraryId:"lib-standard-meeting-type",libraryName:"会议类型数字化库",fields:[f("std-mt-code","会议类型码","meetingTypeCode","text",{digitalId:"5013001001110111",required:true}),f("std-mt-name","会议类型","meetingTypeName","text",{digitalId:"5013001001110112",required:true})],outputKeys:["meetingTypeCode","meetingTypeName"]},
-    std_meeting_room:{code:"5011001001100016",identity:"5013001001100016",libraryId:"lib-standard-meeting-room",libraryName:"会议室数字化库",fields:[f("std-mr-code","会议室编码","meetingRoomCode","text",{digitalId:"5013001001110121",required:true}),f("std-mr-name","会议室名称","meetingRoomName","text",{digitalId:"5013001001110122",required:true}),f("std-mr-cap","容纳人数","capacity","number",{digitalId:"5013001001110123"})],outputKeys:["meetingRoomCode","meetingRoomName","capacity"]},
-    std_review_opinion:{code:"5011001001100017",identity:"5013001001100017",libraryId:"lib-standard-review-opinion",libraryName:"议题审定意见数字化库",fields:[f("std-ro-code","审定意见码","reviewOpinionCode","text",{digitalId:"5013001001110131",required:true}),f("std-ro-name","审定意见","reviewOpinionName","text",{digitalId:"5013001001110132",required:true})],outputKeys:["reviewOpinionCode","reviewOpinionName"]},
-    std_yes_no:{code:"5011001001100018",identity:"5013001001100018",libraryId:"lib-standard-yes-no",libraryName:"是否数字化库",fields:[f("std-yn-code","数字化值码","valueCode","text",{digitalId:"5013001001110141",required:true}),f("std-yn-name","数字化值","valueName","text",{digitalId:"5013001001110142",required:true})],outputKeys:["valueCode","valueName"]},
-    std_org_rank:{code:"5011001001100020",identity:"5013001001100020",libraryId:"lib-standard-org-rank",libraryName:"组织职级数字化库",fields:[
+    std_digital_type:{code:"5011001001100004001",identity:"5013001001100004",libraryId:"lib-standard-digital-type",libraryName:"数字化类型数字化库",fields:[f("std-dt-code","类型码","typeCode","text",{digitalId:"5013001001110001",required:true,pattern:"^[0-9]$"}),f("std-dt-name","数字化类型","typeName","text",{digitalId:"5013001001110002",required:true})],outputKeys:["typeCode","typeName"]},
+    std_code_type:{code:"5011001001100005001",identity:"5013001001100005",libraryId:"lib-standard-code-type",libraryName:"数字化编码类型数字化库",fields:[f("std-ct-code","编码类型码","codeTypeCode","text",{digitalId:"5013001001110011",required:true,pattern:"^[0-9]{3}$"}),f("std-ct-name","数字化编码类型","codeTypeName","text",{digitalId:"5013001001110012",required:true})],outputKeys:["codeTypeCode","codeTypeName"]},
+    std_business_level:{code:"5011001001100006001",identity:"5013001001100006",libraryId:"lib-standard-business-level",libraryName:"业务层级数字化库",fields:[f("std-bl-code","业务层级码","businessLevelCode","text",{digitalId:"5013001001110021",required:true}),f("std-bl-name","业务层级","businessLevelName","text",{digitalId:"5013001001110022",required:true})],outputKeys:["businessLevelCode","businessLevelName"]},
+    std_definition_type:{code:"5011001001100007001",identity:"5013001001100007",libraryId:"lib-standard-definition-type",libraryName:"数字化定义类型数字化库",fields:[f("std-def-code","定义类型码","definitionTypeCode","text",{digitalId:"5013001001110031",required:true}),f("std-def-name","定义类型","definitionTypeName","text",{digitalId:"5013001001110032",required:true})],outputKeys:["definitionTypeCode","definitionTypeName"]},
+    std_object_type:{code:"5011001001100008001",identity:"5013001001100008",libraryId:"lib-standard-object-type",libraryName:"数字化对象类型数字化库",fields:[f("std-obj-code","对象类型码","objectTypeCode","text",{digitalId:"5013001001110041",required:true}),f("std-obj-name","对象类型","objectTypeName","text",{digitalId:"5013001001110042",required:true})],outputKeys:["objectTypeCode","objectTypeName"]},
+    std_attribute_definition:{code:"5011001001100009001",identity:"5013001001100009",libraryId:"lib-standard-attribute-definition",libraryName:"数字化属性定义数字化库",fields:[f("std-attr-code","属性定义码","attributeCode","text",{digitalId:"5013001001110051",required:true}),f("std-attr-name","数字化属性名称","attributeName","text",{digitalId:"5013001001110052",required:true}),f("std-attr-desc","属性说明","attributeDescription","textarea",{digitalId:"5013001001110053",width:12})],outputKeys:["attributeCode","attributeName","attributeDescription"]},
+    std_data_type:{code:"5011001001100010001",identity:"5013001001100010",libraryId:"lib-standard-data-type",libraryName:"数据类型数字化库",fields:[f("std-type-code","数据类型码","dataTypeCode","text",{digitalId:"5013001001110061",required:true}),f("std-type-name","数据类型","dataTypeName","text",{digitalId:"5013001001110062",required:true})],outputKeys:["dataTypeCode","dataTypeName"]},
+    std_org_nature:{code:"5011001001100011001",identity:"5013001001100011",libraryId:"lib-standard-org-nature",libraryName:"组织性质数字化库",fields:[f("std-on-code","组织性质码","organizationNatureCode","text",{digitalId:"5013001001110071",required:true,pattern:"^[0-9]{2}$"}),f("std-on-name","组织性质","organizationNatureName","text",{digitalId:"5013001001110072",required:true})],outputKeys:["organizationNatureCode","organizationNatureName"]},
+    std_admin_approval_level:{code:"5011001001100012001",identity:"5013001001100012",libraryId:"lib-standard-admin-approval-level",libraryName:"行政审批层级数字化库",fields:[f("std-aal-code","行政审批层级码","approvalLevelCode","number",{digitalId:"5013001001110081",required:true,min:0,max:999}),f("std-aal-name","行政审批层级","approvalLevelName","text",{digitalId:"5013001001110082",required:true})],outputKeys:["approvalLevelCode","approvalLevelName"]},
+    std_business_approval_level:{code:"5011001001100013001",identity:"5013001001100013",libraryId:"lib-standard-business-approval-level",libraryName:"业务审批层级数字化库",fields:[f("std-bal-code","业务审批层级码","approvalLevelCode","number",{digitalId:"5013001001110091",required:true,min:0,max:999}),f("std-bal-name","业务审批层级","approvalLevelName","text",{digitalId:"5013001001110092",required:true})],outputKeys:["approvalLevelCode","approvalLevelName"]},
+    std_approval_opinion:{code:"5011001001100014001",identity:"5013001001100014",libraryId:"lib-standard-approval-opinion",libraryName:"审批意见数字化库",fields:[f("std-op-code","审批意见码","opinionCode","text",{digitalId:"5013001001110101",required:true}),f("std-op-name","审批意见","opinionName","text",{digitalId:"5013001001110102",required:true}),f("std-op-terminal","是否终止","terminal","boolean",{digitalId:"5013001001110103",required:true})],outputKeys:["opinionCode","opinionName","terminal"]},
+    std_meeting_type:{code:"5011001001100015001",identity:"5013001001100015",libraryId:"lib-standard-meeting-type",libraryName:"会议类型数字化库",fields:[f("std-mt-code","会议类型码","meetingTypeCode","text",{digitalId:"5013001001110111",required:true}),f("std-mt-name","会议类型","meetingTypeName","text",{digitalId:"5013001001110112",required:true})],outputKeys:["meetingTypeCode","meetingTypeName"]},
+    std_meeting_room:{code:"5011001001100016001",identity:"5013001001100016",libraryId:"lib-standard-meeting-room",libraryName:"会议室数字化库",fields:[f("std-mr-code","会议室编码","meetingRoomCode","text",{digitalId:"5013001001110121",required:true}),f("std-mr-name","会议室名称","meetingRoomName","text",{digitalId:"5013001001110122",required:true}),f("std-mr-cap","容纳人数","capacity","number",{digitalId:"5013001001110123"})],outputKeys:["meetingRoomCode","meetingRoomName","capacity"]},
+    std_review_opinion:{code:"5011001001100017001",identity:"5013001001100017",libraryId:"lib-standard-review-opinion",libraryName:"议题审定意见数字化库",fields:[f("std-ro-code","审定意见码","reviewOpinionCode","text",{digitalId:"5013001001110131",required:true}),f("std-ro-name","审定意见","reviewOpinionName","text",{digitalId:"5013001001110132",required:true})],outputKeys:["reviewOpinionCode","reviewOpinionName"]},
+    std_yes_no:{code:"5011001001100018001",identity:"5013001001100018",libraryId:"lib-standard-yes-no",libraryName:"是否数字化库",fields:[f("std-yn-code","数字化值码","valueCode","text",{digitalId:"5013001001110141",required:true}),f("std-yn-name","数字化值","valueName","text",{digitalId:"5013001001110142",required:true})],outputKeys:["valueCode","valueName"]},
+    std_org_rank:{code:"5011001001100020001",identity:"5013001001100020",libraryId:"lib-standard-org-rank",libraryName:"组织职级数字化库",fields:[
       libraryField("std-or-nature","组织性质","organizationNature","5013001001110151","lib-standard-org-nature","组织性质数字化库","5013001001110072"),
       f("std-or-level","组织层级码","organizationLevelCode","text",{digitalId:"5013001001110152",required:true}),
       f("std-or-rank","职级码","rankCode","text",{digitalId:"5013001001110153",required:true}),
       f("std-or-name","职级含义","rankName","text",{digitalId:"5013001001110154",required:true}),
     ],outputKeys:["organizationNature","organizationLevelCode","rankCode","rankName"]},
-    std_threshold_type:{code:"5011001001100021",identity:"5013001001100021",libraryId:"lib-standard-threshold-type",libraryName:"阈值类型数字化库",fields:[f("std-th-code","阈值类型码","thresholdTypeCode","text",{digitalId:"5013001001110161",required:true}),f("std-th-name","阈值类型","thresholdTypeName","text",{digitalId:"5013001001110162",required:true})],outputKeys:["thresholdTypeCode","thresholdTypeName"]},
-    std_model_timeout:{code:"5011001001100022",identity:"5013001001100022",libraryId:"lib-standard-model-timeout",libraryName:"模型时限数字化库",fields:[f("std-time-hours","模型时限（小时）","timeoutHours","number",{digitalId:"5013001001110171",required:true,min:1}),libraryMultiField("std-time-biz","适用业务范围","businessDomains","5013001001110172","lib-standard-business-definition","业务定义数字化库","5013001001006002")],outputKeys:["timeoutHours","businessDomains"]},
+    std_threshold_type:{code:"5011001001100021001",identity:"5013001001100021",libraryId:"lib-standard-threshold-type",libraryName:"阈值类型数字化库",fields:[f("std-th-code","阈值类型码","thresholdTypeCode","text",{digitalId:"5013001001110161",required:true}),f("std-th-name","阈值类型","thresholdTypeName","text",{digitalId:"5013001001110162",required:true})],outputKeys:["thresholdTypeCode","thresholdTypeName"]},
+    std_model_timeout:{code:"5011001001100022001",identity:"5013001001100022",libraryId:"lib-standard-model-timeout",libraryName:"模型时限数字化库",fields:[f("std-time-hours","模型时限（小时）","timeoutHours","number",{digitalId:"5013001001110171",required:true,min:1}),libraryMultiField("std-time-biz","适用业务范围","businessDomains","5013001001110172","lib-standard-business-definition","业务定义数字化库","5013001001006002")],outputKeys:["timeoutHours","businessDomains"]},
   }
   const spec=specs[key]
   if(!spec) return null
@@ -269,51 +269,51 @@ function controlConfigTemplate(key:TemplateKey):TemplatePreset|null {
   const meta=MODEL_TEMPLATE_CATALOG.find(item=>item.key===key)
   if(!meta || meta.group!=="审批智选配置") return null
   const specs:Record<string,{code:string;identity:string;libraryName:string;fields:Field[];outputs:string[];modelType?:string}>={
-    config_digital:{code:"5011001001200001",identity:"5013001001200001",libraryName:"数字化配置数字化库",fields:[
+    config_digital:{code:"5011001001200001001",identity:"5013001001200001",libraryName:"数字化配置数字化库",fields:[
       libraryField("cfg-d-model","数字化编码对象","targetModelName","5013001001210001","lib-standard-model","模型信息数字化库","5013001001005001"),
       f("cfg-d-code","模型数字化编码","targetModelCode","text",{digitalId:"5013001001210002",readonly:true,sourceMode:"library_fill",linkage:{sourceLibraryId:"lib-standard-model",sourceLibrary:"模型信息数字化库",triggerFieldKey:"targetModelName",matchDigitalId:"5013001001005001",sourceDigitalId:"5013001001005003",mode:"fill"}}),
       libraryMultiField("cfg-d-attr","数字化属性集合","digitalAttributes","5013001001210003","lib-standard-attribute-definition","数字化属性定义数字化库","5013001001110052"),
       libraryMultiField("cfg-d-id","数字化标识集合","digitalIdentifiers","5013001001210004","lib-standard-identifier","数字化标识数字化库","5013001001008002"),
     ],outputs:["targetModelName","targetModelCode","digitalAttributes","digitalIdentifiers"]},
-    config_digital_display:{code:"5011001001200002",identity:"5013001001200002",libraryName:"数字化展示结果库",fields:[
+    config_digital_display:{code:"5011001001200002001",identity:"5013001001200002",libraryName:"数字化展示结果库",fields:[
       f("cfg-show-user","当前操作者","operatorName","user",{digitalId:"5013001001210011",sourceMode:"current_user",readonly:true}),
       f("cfg-show-dept","操作者部门","operatorDepartment","department",{digitalId:"5013001001210012",sourceMode:"library_fill",readonly:true,linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",triggerFieldKey:"operatorName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
       libraryMultiField("cfg-show-code","数字化编码展示集","digitalCodes","5013001001210013","lib-standard-model","模型信息数字化库","5013001001005001"),
       libraryMultiField("cfg-show-attr","数字化属性展示集","digitalAttributes","5013001001210014","lib-standard-attribute-definition","数字化属性定义数字化库","5013001001110052"),
       libraryMultiField("cfg-show-id","数字化标识展示集","digitalIdentifiers","5013001001210015","lib-standard-identifier","数字化标识数字化库","5013001001008002"),
     ],outputs:["operatorName","operatorDepartment","digitalCodes","digitalAttributes","digitalIdentifiers"]},
-    config_admin_approval:{code:"5011001001200003",identity:"5013001001200003",libraryName:"行政审批层级分选数字化库",fields:[
+    config_admin_approval:{code:"5011001001200003001",identity:"5013001001200003",libraryName:"行政审批层级分选数字化库",fields:[
       libraryField("cfg-aa-biz","业务事项","businessName","5013001001210101","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryField("cfg-aa-level","行政审批层级","administrativeApprovalLevel","5013001001210102","lib-standard-admin-approval-level","行政审批层级数字化库","5013001001110082"),
     ],outputs:["businessName","administrativeApprovalLevel"]},
-    config_business_approval:{code:"5011001001200004",identity:"5013001001200004",libraryName:"业务审批层级分选数字化库",fields:[
+    config_business_approval:{code:"5011001001200004001",identity:"5013001001200004",libraryName:"业务审批层级分选数字化库",fields:[
       libraryField("cfg-ba-biz","业务事项","businessName","5013001001210201","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryField("cfg-ba-level","业务审批层级","businessApprovalLevel","5013001001210202","lib-standard-business-approval-level","业务审批层级数字化库","5013001001110092"),
     ],outputs:["businessName","businessApprovalLevel"]},
-    config_position:{code:"5011001001200005",identity:"5013001001200005",libraryName:"岗位分选数字化库",fields:[
+    config_position:{code:"5011001001200005001",identity:"5013001001200005",libraryName:"岗位分选数字化库",fields:[
       libraryField("cfg-pos-biz","业务事项","businessName","5013001001210301","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryField("cfg-pos-use","使用岗","usePerson","5013001001210302","lib-standard-person","人员信息数字化库","5013001001002002"),
       libraryField("cfg-pos-review","审查岗","reviewPerson","5013001001210303","lib-standard-person","人员信息数字化库","5013001001002002"),
       libraryField("cfg-pos-manage","管理岗","managePerson","5013001001210304","lib-standard-person","人员信息数字化库","5013001001002002"),
     ],outputs:["businessName","usePerson","reviewPerson","managePerson"]},
-    config_identifier_trigger:{code:"5011001001200006",identity:"5013001001200006",libraryName:"标识触发配置数字化库",fields:[
+    config_identifier_trigger:{code:"5011001001200006001",identity:"5013001001200006",libraryName:"标识触发配置数字化库",fields:[
       libraryField("cfg-tr-id","业务数字化标识","sourceDigitalIdentifier","5013001001210401","lib-standard-identifier","数字化标识数字化库","5013001001008001"),
       libraryField("cfg-tr-model","关联目标模型","targetModelName","5013001001210402","lib-standard-model","模型信息数字化库","5013001001005001"),
       f("cfg-tr-enabled","是否启用","enabled","boolean",{digitalId:"5013001001210403",required:true,defaultValue:true}),
     ],outputs:["sourceDigitalIdentifier","targetModelName","enabled"]},
-    config_business_ownership:{code:"5011001001200007",identity:"5013001001200007",libraryName:"业务归属配置数字化库",fields:[
+    config_business_ownership:{code:"5011001001200007001",identity:"5013001001200007",libraryName:"业务归属配置数字化库",fields:[
       libraryField("cfg-bo-dept","组织/部门","departmentName","5013001001210501","lib-standard-dept","部门信息数字化库","5013001001003001"),
       libraryMultiField("cfg-bo-biz","业务领域集合","businessDomains","5013001001210502","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       f("cfg-bo-desc","业务归属说明","ownershipDescription","textarea",{digitalId:"5013001001210503",width:12}),
     ],outputs:["departmentName","businessDomains","ownershipDescription"]},
-    config_approval_assignment:{code:"5011001001200008",identity:"5013001001200008",libraryName:"审批分管配置数字化库",fields:[
+    config_approval_assignment:{code:"5011001001200008001",identity:"5013001001200008",libraryName:"审批分管配置数字化库",fields:[
       libraryField("cfg-as-rank","组织职级","organizationRank","5013001001210601","lib-standard-org-rank","组织职级数字化库","5013001001110154"),
       libraryMultiField("cfg-as-admin","行政审批分管业务","administrativeBusinessDomains","5013001001210602","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryMultiField("cfg-as-biz","业务审批分管业务","businessApprovalDomains","5013001001210603","lib-standard-business-definition","业务定义数字化库","5013001001006002"),
       libraryField("cfg-as-ath","行政阈值类型","administrativeThresholdType","5013001001210604","lib-standard-threshold-type","阈值类型数字化库","5013001001110162",{required:false}),
       libraryField("cfg-as-bth","业务阈值类型","businessThresholdType","5013001001210605","lib-standard-threshold-type","阈值类型数字化库","5013001001110162",{required:false}),
     ],outputs:["organizationRank","administrativeBusinessDomains","businessApprovalDomains","administrativeThresholdType","businessThresholdType"]},
-    config_threshold:{code:"5011001001200009",identity:"5013001001200009",libraryName:"审批阈值配置数字化库",fields:[
+    config_threshold:{code:"5011001001200009001",identity:"5013001001200009",libraryName:"审批阈值配置数字化库",fields:[
       libraryField("cfg-th-type","阈值类型","thresholdType","5013001001210701","lib-standard-threshold-type","阈值类型数字化库","5013001001110162"),
       libraryField("cfg-th-id","对应数字化标识","thresholdDigitalIdentifier","5013001001210702","lib-standard-identifier","数字化标识数字化库","5013001001008001"),
       f("cfg-th-value","阈值值","thresholdValue","number",{digitalId:"5013001001210703",required:true}),
@@ -332,10 +332,10 @@ function systemBuildTemplate(key: TemplateKey): TemplatePreset | null {
   const meta = MODEL_TEMPLATE_CATALOG.find(item=>item.key===key)
   if (!meta || !["模型建设","数字化建设"].includes(meta.group)) return null
   const stageMap: Record<string,{code:string;identity:string;stageKey:string;payloadLabel:string}> = {
-    stage_suggestion:{code:"5011001002001001",identity:"5013001002001001",stageKey:"suggestion",payloadLabel:"建议模型内容"},
-    stage_design:{code:"5011001002001002",identity:"5013001002001002",stageKey:"design",payloadLabel:"设计模型内容"},
-    stage_test:{code:"5011001002001003",identity:"5013001002001003",stageKey:"test",payloadLabel:"测试模型内容"},
-    stage_config:{code:"5011001002001004",identity:"5013001002001004",stageKey:"config",payloadLabel:"配置模型内容"},
+    stage_suggestion:{code:"5011001002001001001",identity:"5013001002001001",stageKey:"suggestion",payloadLabel:"建议模型内容"},
+    stage_design:{code:"5011001002001002001",identity:"5013001002001002",stageKey:"design",payloadLabel:"设计模型内容"},
+    stage_test:{code:"5011001002001003001",identity:"5013001002001003",stageKey:"test",payloadLabel:"测试模型内容"},
+    stage_config:{code:"5011001002001004001",identity:"5013001002001004",stageKey:"config",payloadLabel:"配置模型内容"},
   }
   if (stageMap[key]) {
     const x=stageMap[key]
@@ -351,41 +351,41 @@ function systemBuildTemplate(key: TemplateKey): TemplatePreset | null {
   }
 
   const digitalMap: Record<string,{code:string;identity:string;fields:Field[];outputs:string[]}> = {
-    digital_business_definition:{code:"5011001001001001",identity:"5013001001001001",fields:[
+    digital_business_definition:{code:"5011001001001001001",identity:"5013001001001001",fields:[
       f("dbd-name","业务名称","businessName","text",{required:true}),
       f("dbd-parent","上级业务","parentBusiness","dataSelect",{sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-business-definition",sourceLibrary:"业务定义数字化库",sourceDigitalId:"5013001001006002",mode:"options"}}),
       libraryField("dbd-level","业务层级","businessLevel",stableFieldDigitalId("dbd-level:businessLevel"),"lib-standard-business-level","业务层级数字化库","5013001001110022"),
       f("dbd-desc","业务定义","businessDefinition","textarea",{required:true,width:12}),
     ],outputs:["businessName","parentBusiness","businessLevel","businessDefinition"]},
-    digital_definition:{code:"5011001001001002",identity:"5013001001001002",fields:[
+    digital_definition:{code:"5011001001001002001",identity:"5013001001001002",fields:[
       f("dd-name","定义名称","definitionName","text",{required:true}),
       libraryField("dd-type","定义类型","definitionType",stableFieldDigitalId("dd-type:definitionType"),"lib-standard-definition-type","数字化定义类型数字化库","5013001001110032"),
       f("dd-text","定义内容","definitionText","textarea",{required:true,width:12}),
     ],outputs:["definitionName","definitionType","definitionText"]},
-    digital_model_code:{code:"5011001001001003",identity:"5013001001001003",fields:[
+    digital_model_code:{code:"5011001001001003001",identity:"5013001001001003",fields:[
       f("dmc-model","选择模型","targetModelName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-model",sourceLibrary:"模型信息数字化库",sourceDigitalId:"5013001001005001",mode:"options"}}),
       f("dmc-code","模型数字化编码","modelDigitalCode","text",{required:true,pattern:"^[0-9]{19}$",placeholder:"19位模型数字化编码"}),
       f("dmc-domain","业务领域","businessDomain","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-business-definition",sourceLibrary:"业务定义数字化库",sourceDigitalId:"5013001001006002",mode:"options"}}),
     ],outputs:["targetModelName","modelDigitalCode","businessDomain"]},
-    digital_person_code:{code:"5011001001001004",identity:"5013001001001004",fields:[
+    digital_person_code:{code:"5011001001001004001",identity:"5013001001001004",fields:[
       f("dpc-person","选择人员","personName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",sourceDigitalId:"5013001001002002",mode:"options"}}),
       f("dpc-code","人员数字化编码","personDigitalCode","text",{required:true,pattern:"^5011002[0-9]{4}$",placeholder:"11位员工数字化编码"}),
       f("dpc-dept","所属部门","department","department",{readonly:true,sourceMode:"library_fill",linkage:{sourceLibraryId:"lib-standard-person",sourceLibrary:"人员信息数字化库",triggerFieldKey:"personName",matchDigitalId:"5013001001002002",sourceDigitalId:"5013001001002004",mode:"fill"}}),
     ],outputs:["personName","personDigitalCode","department"]},
-    digital_attribute:{code:"5011001001001005",identity:"5013001001001005",fields:[
+    digital_attribute:{code:"5011001001001005001",identity:"5013001001001005",fields:[
       libraryField("dac-type","对象类型","objectType",stableFieldDigitalId("dac-type:objectType"),"lib-standard-object-type","数字化对象类型数字化库","5013001001110042"),
       f("dac-model","模型对象","objectName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-model",sourceLibrary:"模型信息数字化库",sourceDigitalId:"5013001001005001",mode:"options"}}),
       libraryField("dac-attr","数字化属性","attributeName",stableFieldDigitalId("dac-attr:attributeName"),"lib-standard-attribute-definition","数字化属性定义数字化库","5013001001110052"),
       f("dac-value","属性值","attributeValue","text",{required:true}),
     ],outputs:["objectType","objectName","attributeName","attributeValue"]},
-    digital_identifier:{code:"5011001001001006",identity:"5013001001001006",fields:[
+    digital_identifier:{code:"5011001001001006001",identity:"5013001001001006",fields:[
       f("dic-biz","业务归属","businessName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-business-definition",sourceLibrary:"业务定义数字化库",sourceDigitalId:"5013001001006002",mode:"options"}}),
       f("dic-code","数字化标识","digitalIdentifier","text",{required:true,pattern:"^5013[0-9]{15}$",placeholder:"19位数字化标识"}),
       f("dic-name","中文显示名称","displayName","text",{required:true}),
       libraryField("dic-type","数据类型","dataType",stableFieldDigitalId("dic-type:dataType"),"lib-standard-data-type","数据类型数字化库","5013001001110062"),
       f("dic-desc","标识说明","identifierDescription","textarea",{width:12}),
     ],outputs:["businessName","digitalIdentifier","displayName","dataType","identifierDescription"]},
-    digital_library:{code:"5011001001001007",identity:"5013001001001007",fields:[
+    digital_library:{code:"5011001001001007001",identity:"5013001001001007",fields:[
       f("dlc-model","对应模型","targetModelName","dataSelect",{required:true,sourceMode:"library_select",linkage:{sourceLibraryId:"lib-standard-model",sourceLibrary:"模型信息数字化库",sourceDigitalId:"5013001001005001",mode:"options"}}),
       f("dlc-name","数字化库名称","libraryName","text",{required:true}),
       f("dlc-ids","数字化标识列","digitalIdentifierColumns","dataMultiSelect",{required:true,width:12,sourceMode:"library_multi_select",linkage:{sourceLibraryId:"lib-standard-identifier",sourceLibrary:"数字化标识数字化库",sourceDigitalId:"5013001001008002",mode:"options"}}),

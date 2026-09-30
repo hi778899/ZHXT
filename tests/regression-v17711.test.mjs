@@ -8,7 +8,7 @@ const migration=fs.readFileSync("server/migrations/024_unify_runtime_filenames_c
 const rule=fs.readFileSync(".ai/rules/16_MODEL_DIGITAL_CODE_FILENAME_RULES.md","utf8")
 const workbench=fs.readFileSync("src/ModelBuilderWorkbench.tsx","utf8")
 
-assert.match(rule,/当前有效版本：V17\.7\.11/)
+assert.match(rule,/当前有效版本：V17\.7\.(?:11|12)/)
 assert.match(rule,/模型文件名 = 模型数字化编码 \+ 发起\/运行人员员工数字化编码 \+ 时间码/)
 assert.match(rule,/当前运行中数据及既有数字化库运行记录统一生效/)
 assert.match(rule,/model_runs.*数字化库记录.*待办\/已办\/办结/s)
@@ -21,7 +21,7 @@ assert.doesNotMatch(digital,/buildRuntimeFileName[\s\S]{0,250}isModelDigitalCode
 assert.match(builder,/禁止继续生成旧格式模型文件名/)
 assert.match(builder,/SELECT EXISTS\(SELECT 1 FROM model_runs WHERE file_name=\$1\)/)
 assert.match(builder,/model_file_name_migration_issues/)
-assert.match(builder,/必须先完成V17\.7\.11文件名迁移/)
+assert.match(builder,/必须先完成V17\.7\.(?:11文件名迁移|12文件名迁移修复)/)
 
 assert.match(migration,/CREATE TABLE IF NOT EXISTS model_file_name_migrations/)
 assert.match(migration,/CREATE TABLE IF NOT EXISTS model_file_name_migration_issues/)

@@ -59,6 +59,48 @@ FROM digital_codes d
 WHERE d.object_type='model' AND d.object_id=p.model_id AND d.code ~ '^5011001[0-9]{12}$'
   AND COALESCE(p.configuration->>'modelCode','') IS DISTINCT FROM d.code;
 
+
+-- 2A. V17.7.12：为系统内置且仍停留在16位模型编码的建设/数字化/基础/配置模型建立正式19位映射。
+-- 映射规则只适用于系统内置模板模型：在原16位模型编码后增加四级业务编码 001；不得用于普通历史业务模型猜测映射。
+CREATE TABLE IF NOT EXISTS builtin_model_code_migrations (
+  model_id TEXT PRIMARY KEY REFERENCES models(id) ON DELETE CASCADE,
+  model_name TEXT NOT NULL,
+  old_model_code TEXT NOT NULL,
+  new_model_code TEXT NOT NULL,
+  migrated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS builtin_model_code_migrations_new_uq ON builtin_model_code_migrations(new_model_code);
+
+WITH builtin AS (
+  SELECT m.id AS model_id,m.name AS model_name,p.configuration->>'modelCode' AS old_model_code
+  FROM models m JOIN model_projects p ON p.model_id=m.id
+  WHERE COALESCE(p.configuration->>'modelCode','') ~ '^5011001[0-9]{9}$'
+    AND (
+      m.id LIKE 'model-std-%' OR m.id LIKE 'model-config-%' OR
+      m.name IN (
+        '模型建议模型','模型设计模型','模型测试模型','模型配置模型',
+        '业务定义模型','数字化定义模型','模型数字化编码模型','人员数字化编码模型',
+        '数字化属性配置模型','数字化标识建设模型','数字化库配置模型'
+      )
+    )
+), mapped AS (
+  SELECT model_id,model_name,old_model_code,old_model_code || '001' AS new_model_code FROM builtin
+)
+INSERT INTO builtin_model_code_migrations(model_id,model_name,old_model_code,new_model_code)
+SELECT model_id,model_name,old_model_code,new_model_code FROM mapped
+ON CONFLICT(model_id) DO UPDATE SET
+  model_name=EXCLUDED.model_name,old_model_code=EXCLUDED.old_model_code,new_model_code=EXCLUDED.new_model_code,migrated_at=now();
+
+UPDATE model_projects p
+SET configuration=jsonb_set(COALESCE(p.configuration,'{}'::jsonb),'{modelCode}',to_jsonb(m.new_model_code),true),updated_at=now()
+FROM builtin_model_code_migrations m
+WHERE p.model_id=m.model_id AND COALESCE(p.configuration->>'modelCode','')=m.old_model_code;
+
+INSERT INTO digital_codes(id,object_type,object_id,code,display_name)
+SELECT 'dcode-v17712-' || m.model_id,'model',m.model_id,m.new_model_code,m.model_name
+FROM builtin_model_code_migrations m
+ON CONFLICT(object_type,object_id) DO UPDATE SET code=EXCLUDED.code,display_name=EXCLUDED.display_name,updated_at=now();
+
 -- 3. 建立运行文件名永久审计映射。legacy_file_name 只用于审计，现行业务链路只使用 file_name。
 ALTER TABLE model_runs ADD COLUMN IF NOT EXISTS legacy_file_name TEXT;
 CREATE TABLE IF NOT EXISTS model_file_name_migrations (
@@ -199,12 +241,15 @@ FROM model_runs r
 WHERE d.run_id=r.id AND d.data ? 'fileName';
 
 -- 6. 新数据只能写当前文件名。迁移异常旧记录允许原样保留并进入异常清单，禁止继续跨模型流转。
+-- 先标记异常旧记录，再建立约束；PostgreSQL 的 NOT VALID 约束仍会校验后续 UPDATE，顺序反过来会导致历史异常行在补 legacy_file_name 时启动失败。
 ALTER TABLE model_runs DROP CONSTRAINT IF EXISTS model_runs_current_filename_check;
-ALTER TABLE model_runs ADD CONSTRAINT model_runs_current_filename_check
-  CHECK (file_name ~ '^5011001[0-9]{12}-5011002[0-9]{4}-[0-9]{14}([0-9]{3})?([0-9]{3})?$') NOT VALID;
--- 异常旧记录先标记 legacy_file_name，避免其阻断系统启动；新运行仍受唯一索引保护。
 UPDATE model_runs r SET legacy_file_name=COALESCE(r.legacy_file_name,m.old_file_name)
 FROM model_file_name_migrations m WHERE r.id=m.run_id AND m.status='exception';
+ALTER TABLE model_runs ADD CONSTRAINT model_runs_current_filename_check
+  CHECK (
+    file_name ~ '^5011001[0-9]{12}-5011002[0-9]{4}-[0-9]{14}([0-9]{3})?([0-9]{3})?$'
+    OR (legacy_file_name IS NOT NULL AND file_name=legacy_file_name)
+  ) NOT VALID;
 CREATE UNIQUE INDEX IF NOT EXISTS model_runs_current_file_name_uq
   ON model_runs(file_name)
   WHERE legacy_file_name IS NULL AND file_name ~ '^5011001[0-9]{12}-5011002[0-9]{4}-[0-9]{14}([0-9]{3})?([0-9]{3})?$';
