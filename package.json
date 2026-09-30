@@ -18,7 +18,7 @@
     "db:seed": "node server/dist/seed.js",
     "build:all": "vite build && tsc -p server/tsconfig.json",
     "test:done-cluster": "node tests/done-cluster-ui.test.mjs",
-    "test:contracts": "node tests/approval-internal-logic.test.mjs && node tests/dashboard-feedback.test.mjs && node tests/done-cluster-ui.test.mjs && node tests/regression-v1731.test.mjs && node tests/regression-v174.test.mjs && node tests/regression-v1741.test.mjs && node tests/regression-v175.test.mjs && node tests/regression-v176.test.mjs && node tests/regression-v1761.test.mjs && node tests/regression-v177.test.mjs && node tests/regression-v1771.test.mjs && node tests/regression-v1772.test.mjs && node tests/regression-v1773.test.mjs && node tests/regression-v1774.test.mjs && node tests/regression-v1775.test.mjs && node tests/regression-v1777.test.mjs && node tests/regression-v1778.test.mjs && node tests/regression-v1779.test.mjs && node tests/regression-v17711.test.mjs && node tests/regression-v17712.test.mjs && node tests/regression-v17713.test.mjs && node tests/regression-v17714.test.mjs && node tests/regression-v17717.test.mjs && node tests/regression-v17719.test.mjs",
+    "test:contracts": "node tests/approval-internal-logic.test.mjs && node tests/dashboard-feedback.test.mjs && node tests/done-cluster-ui.test.mjs && node tests/regression-v1731.test.mjs && node tests/regression-v174.test.mjs && node tests/regression-v1741.test.mjs && node tests/regression-v175.test.mjs && node tests/regression-v176.test.mjs && node tests/regression-v1761.test.mjs && node tests/regression-v177.test.mjs && node tests/regression-v1771.test.mjs && node tests/regression-v1772.test.mjs && node tests/regression-v1773.test.mjs && node tests/regression-v1774.test.mjs && node tests/regression-v1775.test.mjs && node tests/regression-v1777.test.mjs && node tests/regression-v1778.test.mjs && node tests/regression-v1779.test.mjs && node tests/regression-v17711.test.mjs && node tests/regression-v17712.test.mjs && node tests/regression-v17713.test.mjs && node tests/regression-v17714.test.mjs && node tests/regression-v17717.test.mjs && node tests/regression-v17719.test.mjs && node tests/regression-v17720.test.mjs",
     "test:v174": "node tests/regression-v174.test.mjs",
     "test:v1741": "node tests/regression-v1741.test.mjs",
     "test:v175": "node tests/regression-v175.test.mjs",
@@ -36,7 +36,8 @@
     "test:v17711": "node tests/regression-v17711.test.mjs && node tests/regression-v17712.test.mjs",
     "test:v17714": "node tests/regression-v17714.test.mjs",
     "test:v17717": "node tests/regression-v17717.test.mjs",
-    "test:v17719": "node tests/regression-v17719.test.mjs"
+    "test:v17719": "node tests/regression-v17719.test.mjs",
+    "test:v17720": "node tests/regression-v17720.test.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1",

@@ -1,3 +1,12 @@
+# V17.7.20 模型数字化配置完整性规则
+
+- 所有可运行且进入通用审批的模型，发起前必须在模型数字化配置数字化库中存在当前0622配置。
+- 请假类型标准模型、模型时限模型不得因缺少模型数字化配置导致审批启动失败。
+- 考勤主管必须通过员工信息数字化库与审批分管配置数字化库共同形成业务审查节点，不得写死人名。
+- 相关开发必须同时阅读 `.ai/rules/22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md`。
+
+---
+
 # V17.7.18 审批完整路径完成规则
 
 - 全系统审批模型完成判定以合并、去重后的 `Path_final` 为唯一依据。
@@ -35,7 +44,7 @@
 
 涉及模型、数字化库、审批、智选时，必须同时阅读 `.ai/rules/02_ONE_MODEL_ONE_LIBRARY_RULES.md` 至 `.ai/rules/08_RUNTIME_ENGINE_RULES.md`，以及 `.ai/rules/16_MODEL_DIGITAL_CODE_FILENAME_RULES.md`。
 
-涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`、`.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md` 与 `.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
+涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`、`.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`、`.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md` 与 `.ai/rules/22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
 
 ## 3. 不可违反的红线
 

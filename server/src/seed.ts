@@ -1,5 +1,5 @@
 import { syncActiveEmployeeApprovalDigitalConfigs } from "./employee-digital-config.js"
-import { syncSystemStandardLibraryRecords } from "./data-linkage.js"
+import { syncSystemStandardLibraryRecords, upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
 import { randomUUID } from "node:crypto"
 import { closePool, query } from "./db.js"
 import { hashPassword } from "./security.js"
@@ -142,16 +142,97 @@ async function ensureDraftProject(modelName: string, userId: string, template: T
 
 async function ensureRoleAccount(options: { username: string; displayName: string; department: string; password: string; employeeCode: string; role: "department_manager" | "attendance_supervisor" }) {
   await query("INSERT INTO departments(id,name) VALUES($1,$2) ON CONFLICT(name) DO NOTHING", [randomUUID(), options.department])
-  const existing = await query<{ id: string }>("SELECT id FROM users WHERE lower(username)=lower($1)", [options.username])
+  const existing = await query<{ id: string; department: string }>("SELECT id,COALESCE(department,'') AS department FROM users WHERE lower(username)=lower($1)", [options.username])
   if (!existing.rows[0]?.id) {
     const id = randomUUID()
     await query("INSERT INTO users(id,username,display_name,department,department_id,employee_code,password_hash,role,status) VALUES($1,$2,$3,$4,(SELECT id FROM departments WHERE name=$4),$5,$6,$7,'active')", [id, options.username, options.displayName, options.department, options.employeeCode, await hashPassword(options.password), options.role])
     console.log(`Created ${options.role} account ${options.username}`)
     return id
   }
-  // 已存在的人员账号保留管理员后续维护的姓名、部门和密码，仅确保角色与启用状态正确。
-  await query("UPDATE users SET role=$1,employee_code=COALESCE(NULLIF(employee_code,''),$2),status='active',updated_at=now() WHERE id=$3", [options.role, options.employeeCode, existing.rows[0].id])
+  // 已存在的人员账号原则上保留管理员维护的姓名、部门和密码。
+  // V17.7.20：早期考勤主管默认“综合管理部”并不在0622组织名称数字化库中；仅对这一历史默认值收敛到正式“组织人事部”。
+  const currentDepartment=String(existing.rows[0].department ?? "").trim()
+  const shouldRepairAttendanceDepartment=options.role === "attendance_supervisor" && (!currentDepartment || currentDepartment === "综合管理部")
+  if (shouldRepairAttendanceDepartment) {
+    await query("UPDATE users SET role=$1,employee_code=COALESCE(NULLIF(employee_code,''),$2),department=$3,department_id=(SELECT id FROM departments WHERE name=$3),status='active',updated_at=now() WHERE id=$4", [options.role, options.employeeCode, options.department, existing.rows[0].id])
+  } else {
+    await query("UPDATE users SET role=$1,employee_code=COALESCE(NULLIF(employee_code,''),$2),status='active',updated_at=now() WHERE id=$3", [options.role, options.employeeCode, existing.rows[0].id])
+  }
   return existing.rows[0].id
+}
+
+
+function splitDigitalList(value: unknown) {
+  return String(value ?? "").split(/[,，、;；\n]/).map(item=>item.trim()).filter(Boolean)
+}
+function appendDigitalValue(value: unknown, item: string) {
+  return [...new Set([...splitDigitalList(value),item])].join("；")
+}
+
+async function ensureApprovalFoundationDigitalConfigs(userId:string) {
+  const ATTENDANCE_DOMAIN="5012001005001000000"
+  const DIGITAL_GOVERNANCE_DOMAIN="5012001007000000000"
+
+  // 1. “数字化管理”作为基础数字化/运行标准模型的正式业务分类，不借用其他业务领域。
+  await upsertSystemDigitalLibraryRecord({
+    recordId:"v17720-business-digital-governance",libraryId:"lib-digital-business-classification-0622",ownerId:userId,digitalId:DIGITAL_GOVERNANCE_DOMAIN,identifierValues:{},
+    data:{"一级编码":"007","二级编码":"000","三级编码":"000","四级编码":"000","业务名称":"数字化管理","业务分类数字化属性":DIGITAL_GOVERNANCE_DOMAIN,"数据版本":"0622","数据来源":"V17.7.20基础数字化模型审批配置补齐"},source:"system_approval_foundation_sync"
+  })
+
+  // 2. 设备管理部增加数字化管理业务归属，供本部门发起的基础数字化模型形成行政审批人员。
+  const ownership=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
+    WHERE library_id='lib-standard-business-ownership' AND data->>'数据版本'='0622' AND data->>'组织名称数字化属性'='501200402006'
+    ORDER BY created_at,id LIMIT 1`)
+  if (ownership.rows[0]) {
+    const row=ownership.rows[0]; const data={...(row.data ?? {})}
+    data["业务领域集合"]=appendDigitalValue(data["业务领域集合"],DIGITAL_GOVERNANCE_DOMAIN)
+    data["V17.7.20配置说明"]="设备管理部承担数字化管理类基础模型维护；正式审批仍由审批模型按数字化库动态计算"
+    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-business-ownership",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "501200402006"),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
+  }
+
+  // 3. 四/五级机构负责人增加数字化管理行政审批分管；业务审核岗确保考勤管理技术/业务审查分管。
+  const assignments=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
+    WHERE library_id='lib-standard-approval-assignment' AND data->>'数据版本'='0622'
+      AND data->>'组织职级' IN ('501200302041','501200302051','501200302046') ORDER BY id`)
+  for (const row of assignments.rows) {
+    const data={...(row.data ?? {})}; const orgAttr=String(data["组织职级"] ?? "")
+    if (orgAttr === "501200302041" || orgAttr === "501200302051") data["行政审批分管业务属性集合"]=appendDigitalValue(data["行政审批分管业务属性集合"],DIGITAL_GOVERNANCE_DOMAIN)
+    if (orgAttr === "501200302046") data["技术复核分管业务属性集合"]=appendDigitalValue(data["技术复核分管业务属性集合"],ATTENDANCE_DOMAIN)
+    data["V17.7.20配置说明"]="补齐数字化管理行政审批及考勤管理业务审核岗审查配置"
+    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? orgAttr),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
+  }
+
+  // 4. 考勤主管员工信息数字化配置强校验：即使历史已有正式记录，也补齐业务审核岗、组织人事部和考勤管理业务领域。
+  const attendanceUser=await query<any>(`SELECT id,employee_code,display_name FROM users WHERE role='attendance_supervisor' AND status='active' ORDER BY created_at,id LIMIT 1`)
+  if (attendanceUser.rows[0]) {
+    const user=attendanceUser.rows[0]
+    const existingPerson=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
+      WHERE library_id='lib-standard-person' AND data->>'数据版本'='0622' AND data->>'员工数字化编码'=$1
+      ORDER BY CASE WHEN COALESCE(data->>'数据来源','') LIKE '系统账号同步%' THEN 1 ELSE 0 END,created_at,id LIMIT 1`,[user.employee_code])
+    const row=existingPerson.rows[0]
+    const data={...(row?.data ?? {})}
+    data["员工数字化编码"]=user.employee_code
+    data["员工姓名"]=user.display_name
+    data["组织数字化属性"]="501200302046"
+    data["组织名称数字化属性"]="501200402008"
+    data["业务领域"]=appendDigitalValue(data["业务领域"],ATTENDANCE_DOMAIN)
+    data["身份"]="组织人事部业务审核岗"
+    data["岗位/角色"]="考勤主管"
+    data["数据版本"]="0622"
+    data["数据来源"]="V17.7.20考勤主管审批/审查数字化配置补齐"
+    await upsertSystemDigitalLibraryRecord({recordId:String(row?.id ?? `auto0622-person-${user.id}`),libraryId:"lib-standard-person",ownerId:user.id,digitalId:String(user.employee_code),identifierValues:row?.identifier_values ?? {},data,source:"system_attendance_supervisor_config_sync"})
+  }
+
+  // 5. 请假类型标准模型、模型时限模型补齐0622模型数字化配置。
+  //    请假类型属于考勤管理；模型时限属于数字化管理。数字化标识集合暂按当前审批入口不参与阈值运算，避免沿用旧16位标识作为当前配置。
+  const modelConfigs=[
+    {recordId:"v17720-model-config-leave-type",code:"5011001001100003001",name:"请假类型标准模型",attributes:ATTENDANCE_DOMAIN},
+    {recordId:"v17720-model-config-timeout",code:"5011001001100022001",name:"模型时限模型",attributes:DIGITAL_GOVERNANCE_DOMAIN},
+  ]
+  for (const item of modelConfigs) {
+    await upsertSystemDigitalLibraryRecord({recordId:item.recordId,libraryId:"lib-standard-digital-config",ownerId:userId,digitalId:item.code,identifierValues:{},
+      data:{"模型数字化编码":item.code,"模型名称":item.name,"数字化属性集合":item.attributes,"数字化标识集合":"","数据版本":"0622","数据来源":"V17.7.20补齐基础数字化模型审批入口配置"},source:"system_model_digital_config_sync"})
+  }
 }
 
 async function seed() {
@@ -175,7 +256,7 @@ async function seed() {
   await ensureRoleAccount({
     username: process.env.ATTENDANCE_SUPERVISOR_USERNAME ?? "attendance",
     displayName: process.env.ATTENDANCE_SUPERVISOR_NAME ?? "考勤主管",
-    department: process.env.ATTENDANCE_SUPERVISOR_DEPARTMENT ?? "综合管理部",
+    department: !process.env.ATTENDANCE_SUPERVISOR_DEPARTMENT || process.env.ATTENDANCE_SUPERVISOR_DEPARTMENT === "综合管理部" ? "组织人事部" : process.env.ATTENDANCE_SUPERVISOR_DEPARTMENT,
     password: process.env.ATTENDANCE_SUPERVISOR_PASSWORD ?? "ChangeAttendance123!",
     employeeCode: "50110020017",
     role: "attendance_supervisor",
@@ -231,6 +312,10 @@ async function seed() {
     const template = getTemplatePreset(item.key)
     if (template) await ensurePublishedProject(item.name, userId, template)
   }
+
+  // V17.7.20：基础数字化模型同样是普通业务模型，发布后必须具备模型数字化配置和可计算审批分管数据。
+  // 所有补齐数据均通过对应数据产生模型形成真实 model_runs，再进入数字化库。
+  await ensureApprovalFoundationDigitalConfigs(userId)
 
   // 会议模型簇不是“写死流程”。这里仅建立可编辑的四阶段建设项目，默认保持草稿，用户可逐阶段校核、测试后发布。
   for (const item of getTemplateCatalog().filter(item => item.group === "会议模型簇")) {
