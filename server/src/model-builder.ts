@@ -3,7 +3,7 @@ import { query } from "./db.js"
 import { evaluateExpression, ExpressionError } from "./expression.js"
 import { blankTemplate, getTemplatePreset } from "./model-templates.js"
 import { buildDisplayFileName, buildRuntimeFileName, getEmployeeDigitalCode, isCurrentEmployeeDigitalCode, isCurrentModelDigitalCode, isCurrentRuntimeFileName, isDigital16, isDigitalIdentifier, isEmployeeDigitalCode, isModelDigitalCode, timeCode } from "./digital-codes.js"
-import { buildIdentifierValues, ensureModelDigitalLibrary } from "./data-linkage.js"
+import { buildIdentifierValues, ensureModelDigitalLibrary, upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
 import { ModelBuilderError } from "./errors.js"
 import { resolveApprovalPlan0622, resolveSmartPlan0622 } from "./runtime-0622.js"
 export { ModelBuilderError } from "./errors.js"
@@ -395,6 +395,36 @@ function graphProblems(design: Record<string, unknown>) {
   return problems
 }
 
+
+
+async function ensurePublishedProjectDigitalConfig(userId:string,row:ProjectRow,config:Record<string,unknown>) {
+  const modelCode=String(config.modelCode ?? "").trim()
+  if(!isCurrentModelDigitalCode(modelCode)) throw new ModelBuilderError(400,"模型数字化编码必须符合当前19位结构")
+  const existing=await query<any>(`SELECT id,data,owner_id FROM digital_library_records
+    WHERE library_id='lib-standard-digital-config' AND data->>'数据版本'='0622' AND data->>'模型数字化编码'=$1
+    ORDER BY created_at DESC,id DESC LIMIT 1`,[modelCode])
+  const oldData=plainObject(existing.rows[0]?.data)
+  const split=(value:unknown)=>String(value ?? "").split(/[,，、;；\n]/).map(item=>item.trim()).filter(Boolean)
+  const oldAttrs=split(oldData["数字化属性集合"]).filter(item=>/^5012\d{15}$/.test(item))
+  let attr=oldAttrs[0] ?? ""
+  const category=String(plainObject(row.suggestion).category ?? row.category ?? "").trim()
+  if(!attr && category){
+    const matched=await query<any>(`SELECT data->>'业务分类数字化属性' AS attr FROM digital_library_records
+      WHERE library_id='lib-digital-business-classification-0622' AND data->>'数据版本'='0622' AND data->>'业务名称'=$1
+      ORDER BY created_at DESC,id DESC LIMIT 1`,[category])
+    attr=String(matched.rows[0]?.attr ?? "").trim()
+  }
+  if(!attr){
+    const systemCategories=new Set(["数字化管理","数字化基础","数字化标准","组织标准","审批标准","公共标准","模型建设","审批管理","数字化配置","审批配置","智选配置","智能关联","运行标准","通用"])
+    if(category==="考勤管理") attr="5012001005001000000"
+    else if(systemCategories.has(category)) attr="5012001007000000000"
+  }
+  if(!attr) throw new ModelBuilderError(400,`模型“${row.name}”未配置可确定的业务分类数字化属性，不能发布。请先在业务分类/模型数字化配置数字化库中完成配置`)
+  const identifiers=asArray<string>(config.digitalIdentities).map(v=>String(v).trim()).filter(isDigitalIdentifier)
+  const data={...oldData,"模型数字化编码":modelCode,"模型名称":row.name,"数字化属性集合":oldAttrs.length?oldAttrs.join("；"):attr,"数字化标识集合":identifiers.join("；"),"数据版本":"0622","数据来源":"V17.7.21模型发布完整性自动校验/同步"}
+  await upsertSystemDigitalLibraryRecord({recordId:String(existing.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",ownerId:existing.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"model_publish_config_completeness"})
+}
+
 export async function publishProject(userId: string, projectId: string) {
   const row = await fetchProject("p.id=$1", projectId)
   if (!row) throw new ModelBuilderError(404, "模型建设项目不存在")
@@ -418,7 +448,7 @@ export async function publishProject(userId: string, projectId: string) {
     const stageStatuses = await listBuildStageExecutions(projectId)
     for (const item of stageStatuses) if (item.status !== "已完成") problems.push(`${item.stageModelName}尚未完成“本模型 → 审批模型 → 智选模型”闭环`)
   }
-  if (modelTypeOf(row) === "business") {
+  if (!["approval","smart"].includes(modelTypeOf(row))) {
     const existingRelations = configRelations(config).filter(item => String(item.targetModelName ?? "").trim() !== "审批模型")
     config.relations = [mandatoryBusinessApprovalRelation(), ...existingRelations]
     config.afterArchiveEnabled = true
@@ -442,7 +472,7 @@ export async function publishProject(userId: string, projectId: string) {
     else {
       const targetStartModes = asArray<string>(plainObject(target.configuration).startModes).map(String)
       const requiredMode = relation.mode === "smart" ? "smart" : "hard_link"
-      const mandatoryBusinessApproval = modelTypeOf(row) === "business" && nextModelName === "审批模型" && requiredMode === "hard_link"
+      const mandatoryBusinessApproval = !["approval","smart"].includes(modelTypeOf(row)) && nextModelName === "审批模型" && requiredMode === "hard_link"
       const mandatoryApprovalSmart = modelTypeOf(row) === "approval" && nextModelName === "智选模型" && requiredMode === "hard_link"
       if (targetStartModes.length && !targetStartModes.includes(requiredMode) && !mandatoryBusinessApproval && !mandatoryApprovalSmart) problems.push(`目标模型“${nextModelName}”未配置“${requiredMode}”启动方式，不能使用当前模型关系触发`)
       const targetIds = asArray<string>(plainObject(target.configuration).digitalIdentities).map(String).filter(isDigitalIdentifier)
@@ -450,6 +480,8 @@ export async function publishProject(userId: string, projectId: string) {
     }
   }
   if (problems.length) throw new ModelBuilderError(400, problems.join("；"))
+  // V17.7.21：发布即完成模型数字化配置，不能把配置缺口留到首次业务归档触发审批时才暴露。
+  await ensurePublishedProjectDigitalConfig(userId,row,config)
   await query("UPDATE model_projects SET stage='config',status='published',configuration=$2,published_at=now(),updated_at=now() WHERE id=$1", [projectId, JSON.stringify(config)])
   await ensureModelDigitalLibrary(projectId)
   await query("UPDATE models SET can_start=true WHERE id=$1", [row.model_id])

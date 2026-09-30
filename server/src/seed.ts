@@ -86,7 +86,7 @@ async function ensureSystemModelClusterLinks() {
   // 业务 → 审批：系统固定链路。兼容已经被四阶段编辑过、version>1 且历史 relations 缺失的业务模型。
   const businesses = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
     FROM model_projects p JOIN models m ON m.id=p.model_id
-    WHERE p.status='published' AND COALESCE(p.suggestion->>'modelType','business')='business'`)
+    WHERE p.status='published' AND COALESCE(p.suggestion->>'modelType','business') NOT IN ('approval','smart')`)
   for (const businessRow of businesses.rows) {
     const config = businessRow.configuration && typeof businessRow.configuration === "object" ? { ...businessRow.configuration } : {}
     const relations = Array.isArray(config.relations) ? config.relations.filter((item: any) => String(item?.targetModelName ?? "").trim() !== "审批模型") : []
@@ -235,6 +235,122 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
   }
 }
 
+
+
+const APPROVAL_CONFIG_DOMAIN = {
+  attendance:"5012001005001000000",
+  digitalGovernance:"5012001007000000000",
+} as const
+
+function currentDigitalIds(value:unknown) {
+  if (!Array.isArray(value)) return [] as string[]
+  return [...new Set(value.map(item=>String(item ?? "").trim()).filter(item=>/^5013\d{15}$/.test(item)))]
+}
+
+/**
+ * V17.7.21：全系统模型审批前置配置完整性。
+ * 不是按模型名称逐个打补丁，而是扫描全部已发布模型：
+ * 1) 每个当前19位模型数字化编码必须在“模型数字化配置数字化库”存在0622正式记录；
+ * 2) 数字化属性优先保留人工正式配置；缺失时按模型类别/模板类别匹配现有业务分类数字化属性；
+ * 3) 系统建设、数字化、标准、配置、运行类模型统一归入“数字化管理”，考勤模型归入“考勤管理”；
+ * 4) 配置记录仍通过“模型数字化配置模型”的 system_sync 真实运行形成，禁止直接 INSERT 正式数字化库；
+ * 5) 无法确定业务分类的模型进入完整性异常清单，不猜测业务属性。
+ */
+async function ensureAllPublishedModelDigitalConfigs(userId:string) {
+  const categoryFallback:Record<string,string>={
+    "考勤管理":APPROVAL_CONFIG_DOMAIN.attendance,
+    "数字化管理":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "数字化基础":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "数字化标准":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "组织标准":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "审批标准":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "公共标准":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "模型建设":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "审批管理":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "数字化配置":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "审批配置":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "智选配置":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "智能关联":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "运行标准":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+    "通用":APPROVAL_CONFIG_DOMAIN.digitalGovernance,
+  }
+  const catalogByName=new Map(getTemplateCatalog().map(item=>[item.name,item]))
+  const businessRows=await query<any>(`SELECT data FROM digital_library_records
+    WHERE library_id='lib-digital-business-classification-0622' AND data->>'数据版本'='0622'`)
+  const businessByName=new Map<string,string>()
+  for(const row of businessRows.rows){
+    const data=row.data ?? {}; const name=String(data["业务名称"] ?? "").trim(); const attr=String(data["业务分类数字化属性"] ?? "").trim()
+    if(name && /^5012\d{15}$/.test(attr)) businessByName.set(name,attr)
+  }
+  const published=await query<any>(`SELECT p.id AS project_id,p.configuration,p.suggestion,m.id AS model_id,m.name,m.category,m.can_start,
+      COALESCE(dc.code,p.configuration->>'modelCode','') AS model_code
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    LEFT JOIN digital_codes dc ON dc.object_type='model' AND dc.object_id=m.id AND dc.code ~ '^5011001[0-9]{12}$'
+    WHERE p.status='published' AND m.can_start=true
+    ORDER BY m.name`)
+  await query(`CREATE TABLE IF NOT EXISTS model_digital_config_completeness_issues(
+    id uuid PRIMARY KEY,model_id uuid NOT NULL,project_id uuid,model_name text NOT NULL,model_code text,reason text NOT NULL,detected_at timestamptz NOT NULL DEFAULT now(),resolved_at timestamptz
+  )`)
+  for(const row of published.rows){
+    const modelCode=String(row.model_code ?? "").trim()
+    if(!/^5011001\d{12}$/.test(modelCode)){
+      await query(`INSERT INTO model_digital_config_completeness_issues(id,model_id,project_id,model_name,model_code,reason)
+        SELECT $1,$2,$3,$4,$5,$6 WHERE NOT EXISTS(SELECT 1 FROM model_digital_config_completeness_issues WHERE model_id=$2 AND resolved_at IS NULL AND reason=$6)`,[randomUUID(),row.model_id,row.project_id,row.name,modelCode,"已发布模型缺少当前19位模型数字化编码"])
+      continue
+    }
+    const current=await query<any>(`SELECT id,data,owner_id FROM digital_library_records
+      WHERE library_id='lib-standard-digital-config' AND data->>'数据版本'='0622' AND data->>'模型数字化编码'=$1
+      ORDER BY created_at DESC,id DESC LIMIT 1`,[modelCode])
+    const oldData={...(current.rows[0]?.data ?? {})}
+    const configuredAttrs=splitDigitalList(oldData["数字化属性集合"]).filter(item=>/^5012\d{15}$/.test(item))
+    const catalog=catalogByName.get(String(row.name))
+    const suggestion=row.suggestion ?? {}
+    const category=String(suggestion.category ?? catalog?.category ?? row.category ?? "").trim()
+    const resolvedAttr=configuredAttrs[0] ?? businessByName.get(category) ?? categoryFallback[category] ?? ""
+    if(!resolvedAttr){
+      const reason=`已发布模型未能根据现有数字化库确定业务分类数字化属性（模型类别：${category || "未配置"}）`
+      await query(`INSERT INTO model_digital_config_completeness_issues(id,model_id,project_id,model_name,model_code,reason)
+        SELECT $1,$2,$3,$4,$5,$6 WHERE NOT EXISTS(SELECT 1 FROM model_digital_config_completeness_issues WHERE model_id=$2 AND resolved_at IS NULL AND reason=$6)`,[randomUUID(),row.model_id,row.project_id,row.name,modelCode,reason])
+      continue
+    }
+    const config=row.configuration ?? {}
+    const identifiers=currentDigitalIds(config.digitalIdentities)
+    const data={...oldData,
+      "模型数字化编码":modelCode,"模型名称":row.name,"数字化属性集合":configuredAttrs.length ? configuredAttrs.join("；") : resolvedAttr,
+      "数字化标识集合":identifiers.join("；"),"数据版本":"0622","数据来源":"V17.7.21全系统已发布模型数字化配置完整性同步；人工正式配置优先保留"
+    }
+    await upsertSystemDigitalLibraryRecord({recordId:String(current.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",ownerId:current.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"system_model_config_completeness_sync"})
+    await query("UPDATE model_digital_config_completeness_issues SET resolved_at=now() WHERE model_id=$1 AND resolved_at IS NULL",[row.model_id])
+  }
+
+  // 对所有当前模型数字化配置实际使用到的业务属性做审批分管/时限覆盖检查。
+  const used=await query<any>(`SELECT data FROM digital_library_records WHERE library_id='lib-standard-digital-config' AND data->>'数据版本'='0622'`)
+  const usedDomains=[...new Set(used.rows.flatMap((row:any)=>splitDigitalList(row.data?.["数字化属性集合"])).filter((item:string)=>/^5012\d{15}$/.test(item)))]
+  const assignments=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
+    WHERE library_id='lib-standard-approval-assignment' AND data->>'数据版本'='0622' AND data->>'组织职级' IN ('501200302041','501200302051') ORDER BY id`)
+  for(const row of assignments.rows){
+    const data={...(row.data ?? {})}
+    for(const domain of usedDomains) data["行政审批分管业务属性集合"]=appendDigitalValue(data["行政审批分管业务属性集合"],domain)
+    data["V17.7.21配置说明"]="全系统已发布模型使用到的业务分类均具备基础行政审批分管；相对审批级次仍由实际发起人组织和人员动态计算"
+    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织职级"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
+  }
+  // 默认8小时模型时限是原0622所有普通业务的通用基线；把新增业务域纳入同一基线，而不是在代码中生成时限。
+  const timeout=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
+    WHERE library_id='lib-standard-model-timeout' AND data->>'数据版本'='0622' AND data->>'模型时限'='8' ORDER BY created_at,id LIMIT 1`)
+  if(timeout.rows[0]){
+    const row=timeout.rows[0]; const data={...(row.data ?? {})}
+    for(const domain of usedDomains) data["业务领域集合"]=appendDigitalValue(data["业务领域集合"],domain)
+    data["V17.7.21配置说明"]="全系统已发布模型缺省时限业务域完整性补齐；实际规定时限仍唯一来自模型时限数字化库"
+    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-model-timeout",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "8"),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
+  }
+
+  const unresolved=await query<any>(`SELECT model_name,model_code,reason FROM model_digital_config_completeness_issues WHERE resolved_at IS NULL ORDER BY model_name LIMIT 30`)
+  if(unresolved.rowCount){
+    const message=unresolved.rows.map((item:any)=>`${item.model_name}（${item.model_code || "无编码"}）：${item.reason}`).join("；")
+    throw new Error(`全系统模型数字化配置完整性校验未通过：${message}`)
+  }
+}
+
 async function seed() {
   const user = await query<{ id: string }>("SELECT id FROM users WHERE username = $1", [process.env.INITIAL_ADMIN_USERNAME ?? "zhangshan"])
   let userId = user.rows[0]?.id
@@ -316,6 +432,8 @@ async function seed() {
   // V17.7.20：基础数字化模型同样是普通业务模型，发布后必须具备模型数字化配置和可计算审批分管数据。
   // 所有补齐数据均通过对应数据产生模型形成真实 model_runs，再进入数字化库。
   await ensureApprovalFoundationDigitalConfigs(userId)
+  // V17.7.21：不再仅补“请假类型标准模型/模型时限模型”，扫描所有已发布可运行模型并补齐当前0622模型数字化配置、基础行政审批分管与模型时限业务域。
+  await ensureAllPublishedModelDigitalConfigs(userId)
 
   // 会议模型簇不是“写死流程”。这里仅建立可编辑的四阶段建设项目，默认保持草稿，用户可逐阶段校核、测试后发布。
   for (const item of getTemplateCatalog().filter(item => item.group === "会议模型簇")) {
