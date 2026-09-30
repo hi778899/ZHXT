@@ -1,0 +1,13 @@
+V17.2 静态检查结果
+=================
+
+1. src/App.tsx：TypeScript/TSX 语法转译检查通过。
+2. server/src/index.ts：TypeScript 语法转译检查通过。
+3. server/src/model-builder.ts：TypeScript 语法转译检查通过。
+4. server/src/data-linkage.ts：TypeScript 语法转译检查通过。
+5. 数字化库文件记录列表仅保留“文件名 / 查看详情”两列；详情读取逻辑保留。
+6. 我的已办按业务模型根运行聚合审批模型和智选模型，链路使用 model_runs.source_run_id。
+7. 审批逐级进度从审批模型 run_id 对应 todos 聚合，并兼容 approvalResolvedSteps。
+8. 本版不新增数据库迁移脚本。
+
+说明：当前构建环境无法访问 npm registry，未重新下载 pnpm 依赖执行完整 pnpm run build:all；生产部署时 Dockerfile 会执行完整构建检查。

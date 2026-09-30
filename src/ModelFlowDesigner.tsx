@@ -33,7 +33,7 @@ type Props = {
 
 const nodeTypesMeta: NodeMeta[] = [
   { type: "interaction", title: "交互", description: "人与本模型进行输入、确认或办理交互", mark: "交" },
-  { type: "read", title: "读取", description: "读取数字化库、配置库或前序模型数据", mark: "读" },
+  { type: "read", title: "读取", description: "读取数字化库、配置数字化库或前序模型数据", mark: "读" },
   { type: "parameter", title: "参数", description: "定义本模型运行期间使用的临时参数", mark: "参" },
   { type: "calculation", title: "运算", description: "计算、匹配、转换或聚合数据", mark: "算" },
   { type: "condition", title: "判断", description: "按条件形成是/否两条运行分支", mark: "判" },

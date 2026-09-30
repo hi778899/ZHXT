@@ -1,7 +1,7 @@
 {
   "name": "figma-make-app",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.8",
   "type": "module",
   "packageManager": "pnpm@10.33.4",
   "engines": {
@@ -16,7 +16,23 @@
     "server": "node server/dist/index.js",
     "db:migrate": "node server/dist/migrate.js",
     "db:seed": "node server/dist/seed.js",
-    "build:all": "vite build && tsc -p server/tsconfig.json"
+    "build:all": "vite build && tsc -p server/tsconfig.json",
+    "test:done-cluster": "node tests/done-cluster-ui.test.mjs",
+    "test:contracts": "node tests/approval-internal-logic.test.mjs && node tests/dashboard-feedback.test.mjs && node tests/done-cluster-ui.test.mjs && node tests/regression-v1731.test.mjs && node tests/regression-v174.test.mjs && node tests/regression-v1741.test.mjs && node tests/regression-v175.test.mjs && node tests/regression-v176.test.mjs && node tests/regression-v1761.test.mjs && node tests/regression-v177.test.mjs && node tests/regression-v1771.test.mjs && node tests/regression-v1772.test.mjs && node tests/regression-v1773.test.mjs && node tests/regression-v1774.test.mjs && node tests/regression-v1775.test.mjs && node tests/regression-v1777.test.mjs && node tests/regression-v1778.test.mjs && node tests/regression-v1779.test.mjs",
+    "test:v174": "node tests/regression-v174.test.mjs",
+    "test:v1741": "node tests/regression-v1741.test.mjs",
+    "test:v175": "node tests/regression-v175.test.mjs",
+    "test:v176": "node tests/regression-v176.test.mjs",
+    "test:v1761": "node tests/regression-v1761.test.mjs",
+    "test:v177": "node tests/regression-v177.test.mjs",
+    "test:v1771": "node tests/regression-v1771.test.mjs",
+    "test:v1772": "node tests/regression-v1772.test.mjs",
+    "test:v1773": "node tests/regression-v1773.test.mjs",
+    "test:v1774": "node tests/regression-v1774.test.mjs",
+    "test:v1775": "node tests/regression-v1775.test.mjs",
+    "test:v1777": "node tests/regression-v1777.test.mjs",
+    "test:v1778": "node tests/regression-v1778.test.mjs",
+    "test:v1779": "node tests/regression-v1779.test.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1",

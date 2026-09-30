@@ -1,0 +1,38 @@
+V17.2.1 静态检查结果
+
+检查日期：2026-09-15
+分支：fix/done-cluster-model-detail
+
+1. npm run test:done-cluster
+   结果：通过
+   输出：done-cluster-ui contract passed
+
+2. App.tsx TypeScript transpile 检查
+   结果：通过
+   diagnostics errors=0
+
+3. src/ 与 server/src/ 全部 TS/TSX 语法解析
+   结果：通过
+   files=21, parseErrors=0
+
+4. 生产脚本 bash -n
+   结果：通过
+   scripts/start-production.sh
+   scripts/stop-production.sh
+   scripts/启动生产环境.sh
+
+5. git diff --check
+   结果：通过
+
+6. 服务端与 AI 规则保护区检查
+   结果：通过
+   server/ 未修改
+   .ai/ 未修改
+
+7. 旧“模型簇进度/审批模型进度”前端入口扫描
+   结果：通过
+   src/App.tsx 中已不存在相关旧界面文案与审批进度面板类名。
+
+8. 完整 pnpm run build:all
+   当前生成环境未执行。原因：环境无法解析 registry.npmjs.org，Corepack 无法下载项目锁定的 pnpm@10.33.4。
+   生产服务器覆盖升级后仍需执行：docker compose up -d --build

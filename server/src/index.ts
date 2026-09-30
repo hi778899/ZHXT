@@ -10,6 +10,7 @@ import { createProject, getProject, getPublishedByName, getTemplateCatalog, hand
 import { listDataLibraries, listDataLibraryRecords, lookupDataLibrary, listDigitalIdentifiers } from "./data-linkage.js"
 import { evaluateExpression, ExpressionError } from "./expression.js"
 import { nextEmployeeDigitalCode } from "./digital-codes.js"
+import { ensureEmployeeApprovalDigitalConfig } from "./employee-digital-config.js"
 
 const PORT = Number(process.env.PORT ?? 8787)
 const SESSION_HOURS = Number(process.env.SESSION_HOURS ?? 8)
@@ -107,9 +108,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (req.method === "GET" && url.pathname === "/api/admin/users") { const admin = await requireAdmin(req, res); if (!admin) return; const result = await query("SELECT id,username,display_name,department,employee_code,role,status,created_at FROM users ORDER BY created_at DESC"); return sendJson(res, req, 200, { users: result.rows }) }
     if (req.method === "GET" && url.pathname === "/api/admin/registrations") { const admin = await requireAdmin(req, res); if (!admin) return; const result = await query("SELECT id,username,display_name,department,status,created_at FROM registration_requests ORDER BY created_at DESC"); return sendJson(res, req, 200, { registrations: result.rows }) }
     const registrationMatch = url.pathname.match(/^\/api\/admin\/registrations\/([^/]+)\/(approve|reject)$/)
-    if (registrationMatch && req.method === "POST") { const admin = await requireAdmin(req, res); if (!admin) return; const requestId = registrationMatch[1]; const action = registrationMatch[2]; const result = await query<{id:string;username:string;display_name:string;department:string;password_hash:string}>("SELECT id,username,display_name,department,password_hash FROM registration_requests WHERE id=$1 AND status='pending'", [requestId]); if (!result.rowCount) return sendJson(res, req, 404, { error: "registration_not_found" }); if (action === "reject") { await query("UPDATE registration_requests SET status='rejected',reviewed_by=$1,reviewed_at=now() WHERE id=$2", [admin.id, requestId]); await audit(req, admin.id, "registration_rejected", "registration", requestId); return sendJson(res, req, 200, { ok: true }) } const item=result.rows[0]; const existing=await query("SELECT 1 FROM users WHERE lower(username)=lower($1)",[item.username]); if(existing.rowCount) return sendJson(res, req, 409, {error:"账号已存在"}); const userId=randomUUID(); const employeeCode=await nextEmployeeDigitalCode(); await query("INSERT INTO users(id,username,display_name,department,employee_code,password_hash,role,status) VALUES($1,$2,$3,$4,$5,$6,'user','active')",[userId,item.username,item.display_name,item.department,employeeCode,item.password_hash]); await query("UPDATE registration_requests SET status='approved',reviewed_by=$1,reviewed_at=now() WHERE id=$2",[admin.id,requestId]); await audit(req,admin.id,"registration_approved","registration",requestId,{userId}); return sendJson(res,req,200,{ok:true,userId}) }
+    if (registrationMatch && req.method === "POST") { const admin = await requireAdmin(req, res); if (!admin) return; const requestId = registrationMatch[1]; const action = registrationMatch[2]; const result = await query<{id:string;username:string;display_name:string;department:string;password_hash:string}>("SELECT id,username,display_name,department,password_hash FROM registration_requests WHERE id=$1 AND status='pending'", [requestId]); if (!result.rowCount) return sendJson(res, req, 404, { error: "registration_not_found" }); if (action === "reject") { await query("UPDATE registration_requests SET status='rejected',reviewed_by=$1,reviewed_at=now() WHERE id=$2", [admin.id, requestId]); await audit(req, admin.id, "registration_rejected", "registration", requestId); return sendJson(res, req, 200, { ok: true }) } const item=result.rows[0]; const existing=await query("SELECT 1 FROM users WHERE lower(username)=lower($1)",[item.username]); if(existing.rowCount) return sendJson(res, req, 409, {error:"账号已存在"}); const userId=randomUUID(); const employeeCode=await nextEmployeeDigitalCode(); await query("INSERT INTO users(id,username,display_name,department,employee_code,password_hash,role,status) VALUES($1,$2,$3,$4,$5,$6,'user','active')",[userId,item.username,item.display_name,item.department,employeeCode,item.password_hash]); await ensureEmployeeApprovalDigitalConfig(userId); await query("UPDATE registration_requests SET status='approved',reviewed_by=$1,reviewed_at=now() WHERE id=$2",[admin.id,requestId]); await audit(req,admin.id,"registration_approved","registration",requestId,{userId}); return sendJson(res,req,200,{ok:true,userId}) }
     if (req.method === "POST" && url.pathname.startsWith("/api/admin/users/") && url.pathname.endsWith("/status")) { const admin = await requireAdmin(req, res); if (!admin) return; const id=url.pathname.split("/")[4]; if(id===admin.id) return badRequest(res,req,"不能停用当前管理员账号"); const body=await readJson(req); const status=body.status==="disabled"?"disabled":"active"; const result=await query("UPDATE users SET status=$1,updated_at=now() WHERE id=$2 RETURNING id",[status,id]); if(!result.rowCount) return sendJson(res,req,404,{error:"user_not_found"}); await audit(req,admin.id,"user_status_changed","user",id,{status}); return sendJson(res,req,200,{ok:true,status}) }
-    if (req.method === "POST" && url.pathname.startsWith("/api/admin/users/") && url.pathname.endsWith("/role")) { const admin = await requireAdmin(req, res); if (!admin) return; const id=url.pathname.split("/")[4]; const body=await readJson(req); const role=String(body.role ?? "").trim(); const allowed=new Set(["user","department_manager","attendance_supervisor","admin"]); if(!allowed.has(role)) return badRequest(res,req,"无效的用户角色"); if(id===admin.id && role!=="admin") return badRequest(res,req,"不能取消当前管理员的管理员角色"); const result=await query("UPDATE users SET role=$1,updated_at=now() WHERE id=$2 RETURNING id",[role,id]); if(!result.rowCount) return sendJson(res,req,404,{error:"user_not_found"}); await audit(req,admin.id,"user_role_changed","user",id,{role}); return sendJson(res,req,200,{ok:true,role}) }
+    if (req.method === "POST" && url.pathname.startsWith("/api/admin/users/") && url.pathname.endsWith("/role")) { const admin = await requireAdmin(req, res); if (!admin) return; const id=url.pathname.split("/")[4]; const body=await readJson(req); const role=String(body.role ?? "").trim(); const allowed=new Set(["user","department_manager","attendance_supervisor","admin"]); if(!allowed.has(role)) return badRequest(res,req,"无效的用户角色"); if(id===admin.id && role!=="admin") return badRequest(res,req,"不能取消当前管理员的管理员角色"); const result=await query("UPDATE users SET role=$1,updated_at=now() WHERE id=$2 RETURNING id",[role,id]); if(!result.rowCount) return sendJson(res,req,404,{error:"user_not_found"}); await ensureEmployeeApprovalDigitalConfig(id); await audit(req,admin.id,"user_role_changed","user",id,{role}); return sendJson(res,req,200,{ok:true,role}) }
     if (req.method === "GET" && url.pathname === "/api/admin/audit") { const admin = await requireAdmin(req, res); if (!admin) return; const result = await query("SELECT a.id,a.action,a.resource_type,a.resource_id,a.ip,a.created_at,u.username FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 200"); return sendJson(res, req, 200, { logs: result.rows }) }
     if (req.method === "GET" && url.pathname === "/api/digital-libraries") { return sendJson(res, req, 200, { libraries: await listDataLibraries(user.id, user.role === "admin") }) }
     if (req.method === "GET" && url.pathname === "/api/digital-identifiers") { return sendJson(res, req, 200, { identifiers: await listDigitalIdentifiers() }) }
@@ -139,91 +140,252 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (builderMatch && req.method === "POST" && builderMatch[2] === "publish") { const project = await publishProject(user.id, builderMatch[1]); await audit(req, user.id, "model_published", "model_project", builderMatch[1], { modelId: project.modelId, name: project.name }); return sendJson(res, req, 200, { project }) }
     if (req.method === "GET" && url.pathname === "/api/dashboard") {
       const todos = await query<Todo>("SELECT id,title,model,sender,to_char(COALESCE(due_at,created_at),'YYYY-MM-DD HH24:MI') AS date,status,content FROM todos WHERE owner_id=$1 AND status NOT IN ('已完成','已退回') ORDER BY created_at DESC", [user.id])
+      // 已办：既保留“本人已经办理的动作”，也保留本人发起业务模型的模型簇追溯入口。
+      // 模型簇入口不是进度页面；展开后审批模型/智选模型都直接打开对应模型运行记录。
       const done = await query<Todo & { handled_result:string; handled_at:string; record_kind:string }>(`
         SELECT id,title,model,sender,date,status,content,handled_result,handled_at,record_kind
         FROM (
           SELECT t.id,t.title,t.model,t.sender,
             to_char(COALESCE(t.handled_at,t.created_at),'YYYY-MM-DD HH24:MI') AS date,
-            t.status,t.content,COALESCE(t.handled_result,'已完成') AS handled_result,
+            t.status,
+            CASE WHEN rm.name IN ('审批模型','智选模型') AND rr.id IS NOT NULL THEN jsonb_build_object(
+              'type','model_run','runKind',CASE WHEN rm.name='审批模型' THEN 'approval' ELSE 'smart' END,
+              'runId',rr.id,'fileName',rr.file_name,'displayFileName',rr.display_file_name,'digitalId',rr.digital_id,
+              'sourceModelName',sm.name,'status',rr.status,'input',rr.input_data,'output',rr.output_data,
+              'handledRecord',jsonb_build_object('todoId',t.id,'result',t.handled_result,'handledAt',t.handled_at,'content',t.content)
+            )::text ELSE t.content END AS content,
+            COALESCE(t.handled_result,'已完成') AS handled_result,
             to_char(COALESCE(t.handled_at,t.created_at),'YYYY-MM-DD HH24:MI') AS handled_at,
-            'handled'::text AS record_kind,COALESCE(t.handled_at,t.created_at) AS sort_time
+            CASE WHEN rm.name='审批模型' THEN 'approval_run' WHEN rm.name='智选模型' THEN 'launched' ELSE 'handled' END::text AS record_kind,
+            COALESCE(t.handled_at,t.created_at) AS sort_time
           FROM todos t
-          WHERE t.owner_id=$1 AND t.status IN ('已完成','已退回') AND t.run_id IS NULL
+          LEFT JOIN model_runs rr ON rr.id=t.run_id
+          LEFT JOIN models rm ON rm.id=rr.model_id
+          LEFT JOIN model_runs rs ON rs.id=rr.source_run_id
+          LEFT JOIN models sm ON sm.id=rs.model_id
+          WHERE t.owner_id=$1 AND t.status IN ('已完成','已退回')
+
           UNION ALL
-          SELECT 'cluster:' || br.id AS id,
+
+          SELECT 'business-activity:' || br.id AS id,
             COALESCE(NULLIF(br.display_file_name,''),br.file_name) AS title,
             bm.name AS model,u.display_name AS sender,
             to_char(COALESCE(br.completed_at,br.created_at),'YYYY-MM-DD HH24:MI') AS date,
             br.status,
             jsonb_build_object(
-              'type','model_cluster',
-              'rootRunId',br.id,
-              'fileName',br.file_name,
-              'displayFileName',br.display_file_name,
-              'digitalId',br.digital_id,
-              'businessStatus',br.status,
-              'input',br.input_data,
-              'output',br.output_data,
+              'type','business_model_activity_v2','rootRunId',br.id,'fileName',br.file_name,'displayFileName',br.display_file_name,
+              'digitalId',br.digital_id,'businessStatus',br.status,'input',br.input_data,'output',br.output_data,
+              'phase',CASE
+                WHEN ar.id IS NULL OR ar.status<>'已归档' THEN '申请阶段'
+                WHEN COALESCE(NULLIF(ar.output_data->>'approvalStatus',''),NULLIF(ar.output_data->>'approvalResult',''),'') IN ('审批通过','同意','通过') THEN '有效阶段'
+                ELSE '审批终止/未生效' END,
               'approval',CASE WHEN ar.id IS NULL THEN NULL ELSE jsonb_build_object(
-                'runId',ar.id,
-                'fileName',ar.file_name,
-                'displayFileName',ar.display_file_name,
-                'status',ar.status,
+                'runId',ar.id,'fileName',ar.file_name,'displayFileName',ar.display_file_name,'status',ar.status,
                 'result',COALESCE(NULLIF(ar.output_data->>'approvalStatus',''),NULLIF(ar.output_data->>'approvalResult',''),ar.status),
-                'output',ar.output_data,
-                'progress',COALESCE(ap.steps,'[]'::jsonb)
+                'input',ar.input_data,'output',ar.output_data,'sourceModelName',bm.name,'runKind','approval'
               ) END,
               'smart',CASE WHEN sr.id IS NULL THEN NULL ELSE jsonb_build_object(
-                'runId',sr.id,
-                'fileName',sr.file_name,
-                'displayFileName',sr.display_file_name,
-                'status',sr.status,
+                'runId',sr.id,'fileName',sr.file_name,'displayFileName',sr.display_file_name,'status',sr.status,
                 'result',COALESCE(NULLIF(sr.output_data->>'smartDecision',''),NULLIF(sr.output_data->>'approvalResult',''),sr.status),
-                'output',sr.output_data
+                'input',sr.input_data,'output',sr.output_data,'sourceModelName','审批模型','runKind','smart'
               ) END
             )::text AS content,
-            CASE WHEN ar.id IS NOT NULL AND ar.status='已归档' THEN '有效阶段' ELSE '申请阶段' END AS handled_result,
+            CASE
+              WHEN ar.id IS NULL OR ar.status<>'已归档' THEN '申请阶段'
+              WHEN COALESCE(NULLIF(ar.output_data->>'approvalStatus',''),NULLIF(ar.output_data->>'approvalResult',''),'') IN ('审批通过','同意','通过') THEN '有效阶段'
+              ELSE '审批终止/未生效' END AS handled_result,
             to_char(COALESCE(br.completed_at,br.created_at),'YYYY-MM-DD HH24:MI') AS handled_at,
-            'cluster'::text AS record_kind,COALESCE(br.completed_at,br.created_at) AS sort_time
+            'cluster'::text AS record_kind,
+            COALESCE(br.completed_at,br.created_at) AS sort_time
           FROM model_runs br
           JOIN models bm ON bm.id=br.model_id
           JOIN users u ON u.id=br.owner_id
           LEFT JOIN model_projects bp ON bp.id=br.project_id
           LEFT JOIN LATERAL (
-            SELECT ar0.*
-            FROM model_runs ar0
-            JOIN models am ON am.id=ar0.model_id
-            WHERE ar0.source_run_id=br.id AND am.name='审批模型'
-            ORDER BY ar0.created_at DESC
-            LIMIT 1
+            SELECT ar0.* FROM model_runs ar0 JOIN models am ON am.id=ar0.model_id
+            WHERE am.name='审批模型' AND (
+              ar0.source_run_id=br.id
+              OR ar0.input_data->>'sourceRunId'=br.id::text
+              OR ar0.input_data->>'sourceFileName'=br.file_name
+              OR ar0.input_data->>'前序模型文件名'=br.file_name
+            )
+            ORDER BY ar0.created_at DESC LIMIT 1
           ) ar ON true
           LEFT JOIN LATERAL (
-            SELECT COALESCE(jsonb_agg(jsonb_build_object(
-              'stepIndex',COALESCE(t.step_index,0)+1,
-              'step',CASE WHEN position(' · ' in t.title)>0 THEN split_part(t.title,' · ',array_length(string_to_array(t.title,' · '),1)) ELSE t.title END,
-              'approver',COALESCE(au.display_name,''),
-              'status',t.status,
-              'result',COALESCE(t.handled_result,''),
-              'handledAt',CASE WHEN t.handled_at IS NULL THEN '' ELSE to_char(t.handled_at,'YYYY-MM-DD HH24:MI') END
-            ) ORDER BY t.step_index,t.created_at),'[]'::jsonb) AS steps
-            FROM todos t
-            LEFT JOIN users au ON au.id=t.owner_id
-            WHERE t.run_id=ar.id
-          ) ap ON true
-          LEFT JOIN LATERAL (
-            SELECT sr0.*
-            FROM model_runs sr0
-            JOIN models sm ON sm.id=sr0.model_id
-            WHERE sr0.source_run_id=ar.id AND sm.name='智选模型'
-            ORDER BY sr0.created_at DESC
-            LIMIT 1
+            SELECT sr0.* FROM model_runs sr0 JOIN models sm0 ON sm0.id=sr0.model_id
+            WHERE sm0.name='智选模型' AND (
+              sr0.source_run_id=ar.id
+              OR sr0.input_data->>'sourceRunId'=ar.id::text
+              OR sr0.input_data->>'sourceFileName'=ar.file_name
+              OR sr0.input_data->>'前序模型文件名'=ar.file_name
+              OR sr0.input_data->>'businessRunId'=br.id::text
+              OR sr0.input_data->>'businessFileName'=br.file_name
+              OR sr0.input_data->>'业务模型文件名'=br.file_name
+              OR EXISTS (
+                SELECT 1 FROM todos smart_todo
+                WHERE smart_todo.run_id=sr0.id AND smart_todo.model='智选模型'
+                  AND smart_todo.content LIKE '%' || br.file_name || '%'
+              )
+            )
+            ORDER BY sr0.created_at DESC LIMIT 1
           ) sr ON true
           WHERE br.owner_id=$1
             AND COALESCE(br.trigger_mode,'manual')='manual'
             AND COALESCE(bp.suggestion->>'modelType','business')='business'
-        ) work_done
+        ) activity
         ORDER BY sort_time DESC`, [user.id])
-      return sendJson(res, req, 200, { user: userView(user), todos: todos.rows, done: done.rows })
+
+      // 办结：单个模型自身已经完成并归档；业务模型仍保留申请/有效阶段和关联模型追溯。
+      const completed = await query<Todo & { handled_result:string; handled_at:string; record_kind:string }>(`
+        SELECT r.id,
+          COALESCE(NULLIF(r.display_file_name,''),r.file_name) AS title,
+          m.name AS model,
+          u.display_name AS sender,
+          to_char(COALESCE(r.completed_at,r.created_at),'YYYY-MM-DD HH24:MI') AS date,
+          r.status,
+          jsonb_build_object(
+            'type','completed_model_v1',
+            'runId',r.id,
+            'runKind',CASE WHEN m.name='审批模型' THEN 'approval' WHEN m.name='智选模型' THEN 'smart' ELSE COALESCE(NULLIF(p.suggestion->>'modelType',''),'business') END,
+            'fileName',r.file_name,
+            'displayFileName',r.display_file_name,
+            'digitalId',r.digital_id,
+            'sourceRunId',r.source_run_id,
+            'sourceModelName',sm.name,
+            'input',r.input_data,
+            'output',r.output_data,
+            'status',r.status,
+            'phase',CASE WHEN m.name IN ('审批模型','智选模型') THEN NULL
+              WHEN ar.id IS NULL OR ar.status<>'已归档' THEN '申请阶段'
+              WHEN COALESCE(NULLIF(ar.output_data->>'approvalStatus',''),NULLIF(ar.output_data->>'approvalResult',''),'') IN ('审批通过','同意','通过') THEN '有效阶段'
+              ELSE '审批终止/未生效' END,
+            'approval',CASE WHEN ar.id IS NULL THEN NULL ELSE jsonb_build_object(
+              'runId',ar.id,'fileName',ar.file_name,'displayFileName',ar.display_file_name,
+              'status',ar.status,'digitalId',ar.digital_id,'input',ar.input_data,'output',ar.output_data,
+              'sourceModelName',m.name,'runKind','approval'
+            ) END,
+            'smart',CASE WHEN sr.id IS NULL THEN NULL ELSE jsonb_build_object(
+              'runId',sr.id,'fileName',sr.file_name,'displayFileName',sr.display_file_name,
+              'status',sr.status,'digitalId',sr.digital_id,'input',sr.input_data,'output',sr.output_data,
+              'sourceModelName','审批模型','runKind','smart'
+            ) END
+          )::text AS content,
+          '已办结'::text AS handled_result,
+          to_char(COALESCE(r.completed_at,r.created_at),'YYYY-MM-DD HH24:MI') AS handled_at,
+          'completed_run'::text AS record_kind
+        FROM model_runs r
+        JOIN models m ON m.id=r.model_id
+        JOIN users u ON u.id=r.owner_id
+        LEFT JOIN model_projects p ON p.id=r.project_id
+        LEFT JOIN model_runs source_run ON source_run.id=r.source_run_id
+        LEFT JOIN models sm ON sm.id=source_run.model_id
+        LEFT JOIN LATERAL (
+          SELECT child.* FROM model_runs child JOIN models cm ON cm.id=child.model_id
+          WHERE cm.name='审批模型' AND (
+            child.source_run_id=r.id
+            OR child.input_data->>'sourceRunId'=r.id::text
+            OR child.input_data->>'sourceFileName'=r.file_name
+            OR child.input_data->>'前序模型文件名'=r.file_name
+          )
+          ORDER BY child.created_at DESC LIMIT 1
+        ) ar ON true
+        LEFT JOIN LATERAL (
+          SELECT smart_run.* FROM model_runs smart_run JOIN models stm ON stm.id=smart_run.model_id
+          WHERE stm.name='智选模型' AND (
+            smart_run.source_run_id=ar.id
+            OR smart_run.input_data->>'sourceRunId'=ar.id::text
+            OR smart_run.input_data->>'sourceFileName'=ar.file_name
+            OR smart_run.input_data->>'前序模型文件名'=ar.file_name
+            OR smart_run.input_data->>'businessRunId'=r.id::text
+            OR smart_run.input_data->>'businessFileName'=r.file_name
+            OR smart_run.input_data->>'业务模型文件名'=r.file_name
+            OR EXISTS (
+              SELECT 1 FROM todos smart_todo
+              WHERE smart_todo.run_id=smart_run.id AND smart_todo.model='智选模型'
+                AND smart_todo.content LIKE '%' || r.file_name || '%'
+            )
+          )
+          ORDER BY smart_run.created_at DESC LIMIT 1
+        ) sr ON true
+        WHERE r.status='已归档'
+          AND (
+            r.owner_id=$1
+            OR EXISTS (
+              SELECT 1 FROM todos handled_todo
+              WHERE handled_todo.run_id=r.id AND handled_todo.owner_id=$1
+                AND handled_todo.status IN ('已完成','已退回')
+            )
+          )
+        ORDER BY COALESCE(r.completed_at,r.created_at) DESC`, [user.id])
+
+      const metricResult = await query<{ today_completed:string; today_work_records:string; today_handled:string }>(`
+        SELECT
+          (SELECT COUNT(DISTINCT r.id)::text
+           FROM model_runs r
+           JOIN digital_library_records dlr ON dlr.run_id=r.id
+           WHERE r.status='已归档' AND dlr.created_at::date=CURRENT_DATE
+             AND (r.owner_id=$1 OR EXISTS (
+               SELECT 1 FROM todos t WHERE t.run_id=r.id AND t.owner_id=$1 AND t.status IN ('已完成','已退回')
+             ))) AS today_completed,
+          (SELECT COUNT(*)::text FROM digital_library_records dlr WHERE dlr.owner_id=$1 AND dlr.created_at::date=CURRENT_DATE) AS today_work_records,
+          (SELECT COUNT(*)::text FROM todos t WHERE t.owner_id=$1 AND t.handled_at::date=CURRENT_DATE AND t.status IN ('已完成','已退回')) AS today_handled`, [user.id])
+      const rankResult = await query<{ rank:string; active_users:string }>(`
+        WITH daily AS (
+          SELECT owner_id,COUNT(*) AS total
+          FROM digital_library_records
+          WHERE created_at::date=CURRENT_DATE
+          GROUP BY owner_id
+        ), ranked AS (
+          SELECT owner_id,RANK() OVER (ORDER BY total DESC,owner_id) AS rank
+          FROM daily
+        )
+        SELECT COALESCE((SELECT rank::text FROM ranked WHERE owner_id=$1),'0') AS rank,
+               COALESCE((SELECT COUNT(*)::text FROM daily),'0') AS active_users`, [user.id])
+      const metricRow=metricResult.rows[0] ?? {today_completed:'0',today_work_records:'0',today_handled:'0'}
+      const rankRow=rankResult.rows[0] ?? {rank:'0',active_users:'0'}
+      const metrics = {
+        todayCompleted:Number(metricRow.today_completed ?? 0),
+        todayWorkRecords:Number(metricRow.today_work_records ?? 0),
+        todayHandled:Number(metricRow.today_handled ?? 0),
+        rank:Number(rankRow.rank ?? 0),
+        activeUsers:Number(rankRow.active_users ?? 0),
+        rankLabel:'今日数字化成果数排名',
+      }
+      return sendJson(res, req, 200, { user: userView(user), todos: todos.rows, done: done.rows, completed: completed.rows, metrics: metrics })
+    }
+    const modelRunDetailMatch = url.pathname.match(/^\/api\/model-runs\/([^/]+)\/detail$/)
+    if (req.method === "GET" && modelRunDetailMatch) {
+      const runId = decodeURIComponent(modelRunDetailMatch[1])
+      const runResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.trigger_mode,r.source_run_id,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name,u.display_name AS owner_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id JOIN users u ON u.id=r.owner_id
+        WHERE r.id=$1 AND m.name='智选模型'
+          AND ($3='admin' OR r.owner_id=$2 OR EXISTS(SELECT 1 FROM todos t WHERE t.run_id=r.id AND t.owner_id=$2))
+        LIMIT 1`, [runId,user.id,user.role])
+      if (!runResult.rowCount) return sendJson(res, req, 404, { error: "smart_run_not_found" })
+      const smart = runResult.rows[0]
+      const smartInput = smart.input_data && typeof smart.input_data === "object" && !Array.isArray(smart.input_data) ? smart.input_data as Record<string,unknown> : {}
+      const sourceRunId = String(smart.source_run_id ?? smartInput.sourceRunId ?? "")
+      const sourceFileName = String(smartInput["前序模型文件名"] ?? smartInput.sourceFileName ?? "")
+      const approvalResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.source_run_id,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id
+        WHERE m.name='审批模型' AND (($1<>'' AND r.id=$1) OR ($2<>'' AND r.file_name=$2))
+        ORDER BY CASE WHEN r.id=$1 THEN 0 ELSE 1 END,r.created_at DESC LIMIT 1`, [sourceRunId,sourceFileName])
+      const approval = approvalResult.rows[0] ?? null
+      const approvalInput = approval?.input_data && typeof approval.input_data === "object" && !Array.isArray(approval.input_data) ? approval.input_data as Record<string,unknown> : {}
+      const businessRunId = String(smartInput.businessRunId ?? smartInput["业务模型运行ID"] ?? approval?.source_run_id ?? approvalInput.sourceRunId ?? "")
+      const businessFileName = String(smartInput["业务模型文件名"] ?? smartInput.businessFileName ?? approvalInput["前序模型文件名"] ?? approvalInput.sourceFileName ?? "")
+      const businessResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name,u.display_name AS owner_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id JOIN users u ON u.id=r.owner_id
+        WHERE m.name NOT IN ('审批模型','智选模型') AND (($1<>'' AND r.id=$1) OR ($2<>'' AND r.file_name=$2))
+        ORDER BY CASE WHEN r.id=$1 THEN 0 ELSE 1 END,r.created_at DESC LIMIT 1`, [businessRunId,businessFileName])
+      const business = businessResult.rows[0] ?? null
+      const smartLibraryResult = await query<any>(`SELECT library_name,digital_id,identifier_values,data,created_at FROM digital_library_records WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1`, [smart.id])
+      const approvalLibraryResult = approval?.id ? await query<any>(`SELECT library_name,digital_id,identifier_values,data,created_at FROM digital_library_records WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1`, [approval.id]) : { rows: [] as any[] }
+      const businessLibraryResult = business?.id ? await query<any>(`SELECT library_name,digital_id,identifier_values,data,created_at FROM digital_library_records WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1`, [business.id]) : { rows: [] as any[] }
+      // model_runs 仅用于运行定位、文件名、状态和关联追溯；业务字段的正式展示值必须来自对应数字化库。
+      const normalizeRun = (row:any) => row ? ({ id:String(row.id ?? ""), modelName:String(row.model_name ?? ""), ownerName:String(row.owner_name ?? ""), fileName:String(row.file_name ?? ""), displayFileName:String(row.display_file_name ?? ""), digitalId:String(row.digital_id ?? ""), status:String(row.status ?? ""), sourceRunId:String(row.source_run_id ?? ""), triggerMode:String(row.trigger_mode ?? ""), createdAt:row.created_at ?? null, completedAt:row.completed_at ?? null }) : null
+      const normalizeLibrary = (row:any) => row ? ({ libraryName:String(row.library_name ?? ""), digitalId:String(row.digital_id ?? ""), identifierValues:row.identifier_values && typeof row.identifier_values === "object" ? row.identifier_values : {}, data:row.data && typeof row.data === "object" ? row.data : {}, createdAt:row.created_at ?? null }) : null
+      return sendJson(res, req, 200, { detail: { run:normalizeRun(smart), sourceApproval:normalizeRun(approval), businessRun:normalizeRun(business), smartDigitalRecord:normalizeLibrary(smartLibraryResult.rows[0] ?? null), sourceApprovalDigitalRecord:normalizeLibrary(approvalLibraryResult.rows[0] ?? null), businessDigitalRecord:normalizeLibrary(businessLibraryResult.rows[0] ?? null) } })
     }
     if (req.method === "GET" && url.pathname === "/api/models") {
       const models = await query(`SELECT m.id,m.name,m.category,m.description,m.can_start

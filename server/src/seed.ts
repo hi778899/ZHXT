@@ -1,9 +1,42 @@
+import { syncActiveEmployeeApprovalDigitalConfigs } from "./employee-digital-config.js"
 import { randomUUID } from "node:crypto"
 import { closePool, query } from "./db.js"
 import { hashPassword } from "./security.js"
 import { getTemplateCatalog, getTemplatePreset, type TemplatePreset } from "./model-templates.js"
 
 const initialPassword = process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!"
+
+const caseUserInitialPassword = process.env.CASE_USER_INITIAL_PASSWORD || initialPassword
+
+const CASE_USERS = [
+  { employeeCode:"50110020001", displayName:"苗士勇", department:"总经理组成人员" },
+  { employeeCode:"50110020002", displayName:"高胜军", department:"安全监察部" },
+  { employeeCode:"50110020003", displayName:"李天宇", department:"安全监察部" },
+  { employeeCode:"50110020004", displayName:"刘思琛", department:"安全监察部" },
+  { employeeCode:"50110020005", displayName:"张会强", department:"采购与物资管理中心" },
+  { employeeCode:"50110020006", displayName:"于俊清", department:"采购管理科" },
+  { employeeCode:"50110020007", displayName:"周敏", department:"组织人事部" },
+  { employeeCode:"50110020008", displayName:"王琳", department:"组织人事部" },
+  { employeeCode:"50110020009", displayName:"陈明", department:"组织人事部" },
+  { employeeCode:"50110020010", displayName:"总经理", department:"总经理组成人员" },
+  { employeeCode:"50110020012", displayName:"董事长", department:"董事会" },
+  { employeeCode:"50110020013", displayName:"孙磊", department:"财务管理部" },
+  { employeeCode:"50110020014", displayName:"何宁", department:"财务管理部" },
+]
+
+async function ensureCaseAccount(person:{employeeCode:string;displayName:string;department:string}) {
+  await query("INSERT INTO departments(id,name) VALUES($1,$2) ON CONFLICT(name) DO NOTHING",[randomUUID(),person.department])
+  const byCode=await query<{id:string}>("SELECT id FROM users WHERE employee_code=$1 LIMIT 1",[person.employeeCode])
+  const byUsername=byCode.rows[0]?.id ? {rows:[]} : await query<{id:string}>("SELECT id FROM users WHERE lower(username)=lower($1) LIMIT 1",[person.employeeCode])
+  const id=byCode.rows[0]?.id ?? byUsername.rows[0]?.id
+  if (!id) {
+    const userId=randomUUID()
+    await query("INSERT INTO users(id,username,display_name,department,department_id,employee_code,password_hash,role,status) VALUES($1,$2,$3,$4,(SELECT id FROM departments WHERE name=$4),$5,$6,'user','active')",[userId,person.employeeCode,person.displayName,person.department,person.employeeCode,await hashPassword(caseUserInitialPassword)])
+    console.log(`Created 0622 case account ${person.employeeCode} ${person.displayName}`)
+    return
+  }
+  await query("UPDATE users SET employee_code=$1,display_name=$2,department=$3,department_id=(SELECT id FROM departments WHERE name=$3),status='active',updated_at=now() WHERE id=$4",[person.employeeCode,person.displayName,person.department,id])
+}
 
 async function ensurePublishedProject(modelName: string, userId: string, template: TemplatePreset) {
   const model = await query<{ id: string }>("SELECT id FROM models WHERE name=$1", [modelName])
@@ -21,6 +54,54 @@ async function ensurePublishedProject(modelName: string, userId: string, templat
     await query("UPDATE model_projects SET stage='config',status='published',suggestion=$1,design=$2,test_data=$3,test_report=$4,configuration=$5,test_passed=true,published_at=COALESCE(published_at,now()),updated_at=now() WHERE id=$6", [JSON.stringify(template.suggestion), JSON.stringify(template.design), JSON.stringify(template.testData), JSON.stringify(report), JSON.stringify(template.configuration), project.rows[0].id])
   }
   await query("UPDATE models SET can_start=true WHERE id=$1", [model.rows[0].id])
+}
+
+async function ensureSystemModelClusterLinks() {
+  // 业务 → 审批：系统固定链路。兼容已经被四阶段编辑过、version>1 且历史 relations 缺失的业务模型。
+  const businesses = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    WHERE p.status='published' AND COALESCE(p.suggestion->>'modelType','business')='business'`)
+  for (const businessRow of businesses.rows) {
+    const config = businessRow.configuration && typeof businessRow.configuration === "object" ? { ...businessRow.configuration } : {}
+    const relations = Array.isArray(config.relations) ? config.relations.filter((item: any) => String(item?.targetModelName ?? "").trim() !== "审批模型") : []
+    config.relations = [{ id:"system-business-approval",enabled:true,mode:"hard_link",targetModelName:"审批模型",condition:{fieldKey:"",operator:"always",value:""},description:"系统固定链路：业务模型数字化库正式入库后必须启动通用审批模型" }, ...relations]
+    config.afterArchiveEnabled = true
+    config.nextModelName = "审批模型"
+    await query("UPDATE model_projects SET configuration=$1,updated_at=now() WHERE id=$2", [JSON.stringify(config), businessRow.id])
+  }
+
+  const approval = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    WHERE m.name='审批模型' ORDER BY p.updated_at DESC LIMIT 1`)
+  const row = approval.rows[0]
+  if (row?.id) {
+    const config = row.configuration && typeof row.configuration === "object" ? { ...row.configuration } : {}
+    const relations = Array.isArray(config.relations) ? config.relations.filter((item: any) => String(item?.targetModelName ?? "").trim() !== "智选模型") : []
+    config.relations = [{ id:"system-approval-smart",enabled:true,mode:"hard_link",targetModelName:"智选模型",condition:{fieldKey:"",operator:"always",value:""},description:"系统固定链路：审批模型数字化库正式入库后必须启动通用智选模型" }, ...relations]
+    config.afterArchiveEnabled = true
+    config.nextModelName = "智选模型"
+    const startModes = Array.isArray(config.startModes) ? config.startModes.map(String) : []
+    config.startModes = startModes.includes("hard_link") ? startModes : [...startModes, "hard_link"]
+    await query("UPDATE model_projects SET configuration=$1,updated_at=now() WHERE id=$2", [JSON.stringify(config), row.id])
+  }
+
+  const smart = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    WHERE m.name='智选模型' ORDER BY p.updated_at DESC LIMIT 1`)
+  const smartRow = smart.rows[0]
+  if (smartRow?.id) {
+    const config = smartRow.configuration && typeof smartRow.configuration === "object" ? { ...smartRow.configuration } : {}
+    const startModes = Array.isArray(config.startModes) ? config.startModes.map(String) : []
+    if (!startModes.includes("hard_link")) {
+      config.startModes = [...startModes, "hard_link"]
+      await query("UPDATE model_projects SET configuration=$1,updated_at=now() WHERE id=$2", [JSON.stringify(config), smartRow.id])
+    }
+  }
+}
+
+// 保留原函数名作为兼容入口；当前实现同时修复业务→审批与审批→智选两条系统固定链路。
+async function ensureSystemApprovalSmartLink() {
+  return ensureSystemModelClusterLinks()
 }
 
 async function ensureDraftProject(modelName: string, userId: string, template: TemplatePreset) {
@@ -74,6 +155,10 @@ async function seed() {
     role: "attendance_supervisor",
   })
 
+  // 0622案例人员账号：用户名直接使用员工数字化编码；密码只从环境变量读取，不在代码中写死。
+  for (const person of CASE_USERS) await ensureCaseAccount(person)
+
+
   const models = [
     ["请休假模型", "考勤管理", "采集请休假申请、计算业务结果并归档；归档后按模型关系触发独立审批模型"],
     ["会议议题提报", "会议管理", "根据会议类型匹配议题模板并生成提报结果"],
@@ -93,11 +178,11 @@ async function seed() {
     ["模型配置模型", "模型建设", "独立配置目标模型数字化库、启动方式、模型关系并形成发布结果"],
     ["业务定义模型", "数字化管理", "建立业务领域、业务层级、业务颗粒和业务边界定义"],
     ["数字化定义模型", "数字化管理", "建立数字化编码、数字化属性、数字化标识和数字化库的系统定义"],
-    ["模型数字化编码模型", "数字化管理", "为模型分配16位模型数字化编码"],
-    ["人员数字化编码模型", "数字化管理", "为人员分配16位人员数字化编码"],
+    ["模型数字化编码模型", "数字化管理", "为模型分配当前19位模型数字化编码"],
+    ["人员数字化编码模型", "数字化管理", "为人员分配当前11位员工数字化编码"],
     ["数字化属性配置模型", "数字化管理", "在模型、人员等数字化编码对象下配置数字化属性"],
-    ["数字化标识建设模型", "数字化管理", "建立16位数字化标识、中文显示名称、数据类型和业务归属"],
-    ["数字化库配置模型", "数字化管理", "将数字化标识组合成数字化库并配置标准库能力"],
+    ["数字化标识建设模型", "数字化管理", "建立当前19位数字化标识、中文显示名称、数据类型和业务归属"],
+    ["数字化库配置模型", "数字化管理", "将数字化标识组合成数字化库并配置数据源能力"],
   ]
   for (const [name, category, description] of models) {
     await query("INSERT INTO models(id,name,category,description) VALUES($1,$2,$3,$4) ON CONFLICT(name) DO UPDATE SET category=EXCLUDED.category,description=EXCLUDED.description", [randomUUID(), name, category, description])
@@ -111,9 +196,11 @@ async function seed() {
   await ensurePublishedProject("智选模型", userId, smart)
   await ensurePublishedProject("审批模型", userId, approval)
   await ensurePublishedProject("请休假模型", userId, leave)
+  // 系统固定模型簇链路必须兼容历史已编辑项目；不能依赖 version=1 的模板刷新。
+  await ensureSystemApprovalSmartLink()
 
-  // 四个建设阶段、数字化建设、基础标准库和审批/智选配置均通过独立模型运行。它们和普通业务模型一样归档后进入通用审批→智选。
-  for (const item of getTemplateCatalog().filter(item => ["模型建设","数字化建设","基础标准库","审批智选配置"].includes(item.group))) {
+  // 四个建设阶段、数字化建设、基础数字化库和审批/智选配置均通过独立模型运行。它们和普通业务模型一样归档后进入通用审批→智选。
+  for (const item of getTemplateCatalog().filter(item => ["模型建设","数字化建设","基础数字化库","审批智选配置"].includes(item.group))) {
     const template = getTemplatePreset(item.key)
     if (template) await ensurePublishedProject(item.name, userId, template)
   }
@@ -132,6 +219,10 @@ async function seed() {
     const todos = [["模型建设标准更新待确认", "模型建设", "设备管理部", "待确认"], ["运行记录补充填报", "设备运转统计", "船机管理组", "待处理"], ["驾驶舱要素配置审核", "配置审批", "数字化工作组", "处理中"]]
     for (const [title, model, sender, status] of todos) await query("INSERT INTO todos(id,title,model,sender,owner_id,status,content) VALUES($1,$2,$3,$4,$5,$6,$7)", [randomUUID(), title, model, sender, userId, status, "请核对本事项相关内容及附件，根据实际情况填写办理意见。"])
   }
+
+  const employeeSync=await syncActiveEmployeeApprovalDigitalConfigs()
+  const employeeSyncFailures=employeeSync.filter(item=>!item.configured)
+  if (employeeSyncFailures.length) console.warn("Employee digital config sync skipped for some users",employeeSyncFailures)
 
 }
 

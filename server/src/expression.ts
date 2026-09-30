@@ -6,8 +6,8 @@ type Context = Record<string, unknown>
 
 const isSpace = (ch: string) => /\s/.test(ch)
 const isDigit = (ch: string) => /[0-9]/.test(ch)
-const isIdentStart = (ch: string) => /[A-Za-z_$]/.test(ch)
-const isIdent = (ch: string) => /[A-Za-z0-9_.$]/.test(ch)
+const isIdentStart = (ch: string) => /[\p{L}_$]/u.test(ch)
+const isIdent = (ch: string) => /[\p{L}\p{N}_.$]/u.test(ch)
 
 function tokenize(source: string): Token[] {
   const tokens: Token[] = []

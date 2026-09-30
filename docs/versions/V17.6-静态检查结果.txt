@@ -1,0 +1,27 @@
+V17.6 / 18.3.6.1 静态检查结果
+
+1. npm run test:contracts
+   结果：8组契约/回归测试全部通过。
+   包含：审批内部逻辑、驾驶舱反馈、办结模型直达、V17.3.1、V17.4、V17.4.1、V17.5、V17.6。
+
+2. TypeScript / TSX 语法解析
+   范围：src/ + server/src/，共22个 .ts/.tsx 文件。
+   结果：errors=0。
+
+3. Shell 脚本语法
+   scripts/start-production.sh
+   scripts/stop-production.sh
+   scripts/启动生产环境.sh
+   结果：bash -n 通过。
+
+4. Git 空白/冲突检查
+   git diff --check
+   结果：通过。
+
+5. 数据库迁移
+   本版不新增 migration；最新仍为 020_digital_structure_0622_and_control_data.sql。
+
+6. 完整生产构建
+   npm run build:all 未能在当前生成环境执行完成，原因：当前工作目录没有安装 node_modules，本地 vite 不存在（sh: vite: not found）。
+   server tsc --noEmit 也因当前环境缺少 @types/node 无法做完整类型解析。
+   因此本文件不声明完整生产构建通过；生产服务器应由 Docker 构建安装锁定依赖后完成最终构建。

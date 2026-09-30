@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { query } from "./db.js"
 import { ModelBuilderError } from "./errors.js"
+import { isDigitalIdentifier } from "./digital-codes.js"
 
 export type DigitalLibraryColumn = {
   digitalId: string
@@ -109,12 +110,12 @@ async function libraryColumns(libraryId: string): Promise<DigitalLibraryColumn[]
     if (!isRecord(raw)) continue
     const digitalId = str(raw.digitalId).trim()
     const key = str(raw.key).trim()
-    if (/^\d{16}$/.test(digitalId) && key) fieldKeyByDigitalId.set(digitalId,key)
+    if (isDigitalIdentifier(digitalId) && key) fieldKeyByDigitalId.set(digitalId,key)
   }
   const outputMap = isRecord(design.outputDigitalMap) ? design.outputDigitalMap : {}
   for (const [key,digitalIdRaw] of Object.entries(outputMap)) {
     const digitalId = str(digitalIdRaw).trim()
-    if (/^\d{16}$/.test(digitalId) && key) fieldKeyByDigitalId.set(digitalId,key)
+    if (isDigitalIdentifier(digitalId) && key) fieldKeyByDigitalId.set(digitalId,key)
   }
   return result.rows.map((row:any) => ({
     digitalId: String(row.code), displayName: String(row.display_name), fieldKey: fieldKeyByDigitalId.get(String(row.code)) || undefined, dataType: String(row.data_type), required: Boolean(row.required),
@@ -142,7 +143,7 @@ export async function syncSystemStandardLibraryRecords() {
     }
     const id = `std-person-${row.id}`
     await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data,created_at)
-      VALUES($1,NULL,NULL,NULL,$2,'人员信息标准库','5013001001002001','lib-standard-person',$3,$4,COALESCE($5,now()))
+      VALUES($1,NULL,NULL,NULL,$2,'人员信息数字化库','5013001001002001','lib-standard-person',$3,$4,COALESCE($5,now()))
       ON CONFLICT(id) DO UPDATE SET owner_id=EXCLUDED.owner_id,identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,
       [id,row.id,JSON.stringify(values),JSON.stringify({人员数字化编码:row.employee_code,人员姓名:row.display_name,人员账号:row.username,所属部门:row.department,人员角色:row.role,人员状态:row.status,组织职级:values["5013001001002007"],身份说明:values["5013001001002009"]}),row.created_at])
   }
@@ -155,7 +156,7 @@ export async function syncSystemStandardLibraryRecords() {
     }
     const id = `std-dept-${row.id}`
     await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data,created_at)
-      VALUES($1,NULL,NULL,NULL,NULL,'部门信息标准库','5013001001003001','lib-standard-dept',$2,$3,COALESCE($4,now()))
+      VALUES($1,NULL,NULL,NULL,NULL,'部门信息数字化库','5013001001003001','lib-standard-dept',$2,$3,COALESCE($4,now()))
       ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,
       [id,JSON.stringify(values),JSON.stringify({部门名称:row.name,上级部门:row.parent_name ?? "",部门状态:row.status}),row.created_at])
   }
@@ -170,7 +171,7 @@ export async function syncSystemStandardLibraryRecords() {
       "5013001001005004": row.project_status === "published" ? "已发布" : row.project_status || (row.can_start ? "可用" : "建设中"),
     }
     await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data)
-      VALUES($1,NULL,NULL,NULL,NULL,'模型信息标准库','5013001001005001','lib-standard-model',$2,$3)
+      VALUES($1,NULL,NULL,NULL,NULL,'模型信息数字化库','5013001001005001','lib-standard-model',$2,$3)
       ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,
       [`std-model-${row.id}`,JSON.stringify(values),JSON.stringify({模型名称:row.name,模型类别:row.category,模型数字化编码:String(config.modelCode ?? ""),模型状态:values["5013001001005004"]})])
   }
@@ -179,25 +180,25 @@ export async function syncSystemStandardLibraryRecords() {
   for (const row of business.rows) {
     const parent = row.parent_id ? business.rows.find((x:any)=>x.id===row.parent_id)?.name ?? "" : ""
     const values={"5013001001006001":row.code,"5013001001006002":row.name,"5013001001006003":parent,"5013001001006004":row.level_no,"5013001001006005":row.description}
-    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'业务定义标准库','5013001001006002','lib-standard-business-definition',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-biz-${row.id}`,JSON.stringify(values),JSON.stringify({业务编码:row.code,业务名称:row.name,上级业务:parent,业务层级:row.level_no,业务定义:row.description})])
+    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'业务定义数字化库','5013001001006002','lib-standard-business-definition',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-biz-${row.id}`,JSON.stringify(values),JSON.stringify({业务编码:row.code,业务名称:row.name,上级业务:parent,业务层级:row.level_no,业务定义:row.description})])
   }
   const definitions = await query<any>(`SELECT id,code,name,definition_type,definition_text FROM digital_definitions WHERE status='active' ORDER BY code`)
   for (const row of definitions.rows) {
     const values={"5013001001007001":row.code,"5013001001007002":row.name,"5013001001007003":row.definition_type,"5013001001007004":row.definition_text}
-    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化定义标准库','5013001001007002','lib-standard-digital-definition',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-def-${row.id}`,JSON.stringify(values),JSON.stringify({定义编码:row.code,定义名称:row.name,定义类型:row.definition_type,定义内容:row.definition_text})])
+    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化定义数字化库','5013001001007002','lib-standard-digital-definition',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-def-${row.id}`,JSON.stringify(values),JSON.stringify({定义编码:row.code,定义名称:row.name,定义类型:row.definition_type,定义内容:row.definition_text})])
   }
   const identifiers = await query<any>(`SELECT id,code,display_name,data_type,description FROM digital_identifiers WHERE status='active' ORDER BY code`)
   for (const row of identifiers.rows) {
     const values={"5013001001008001":row.code,"5013001001008002":row.display_name,"5013001001008003":row.data_type,"5013001001008004":row.description}
-    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化标识标准库','5013001001008001','lib-standard-identifier',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-did-${row.id}`,JSON.stringify(values),JSON.stringify({数字化标识:row.code,中文名称:row.display_name,数据类型:row.data_type,标识说明:row.description})])
+    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化标识数字化库','5013001001008001','lib-standard-identifier',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-did-${row.id}`,JSON.stringify(values),JSON.stringify({数字化标识:row.code,中文名称:row.display_name,数据类型:row.data_type,标识说明:row.description})])
   }
   const libraries = await query<any>(`SELECT id,name,library_type,is_standard,allow_as_source FROM digital_libraries WHERE status='active' ORDER BY name`)
   for (const row of libraries.rows) {
     if (row.id==='lib-standard-library-catalog') continue
-    const values={"5013001001009001":row.name,"5013001001009002":row.library_type === 'standard' ? '标准库' : '模型库',"5013001001009003":row.is_standard ? '是' : '否',"5013001001009004":row.allow_as_source ? '是' : '否'}
-    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化库目录标准库','5013001001009001','lib-standard-library-catalog',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-lib-${row.id}`,JSON.stringify(values),JSON.stringify({数字化库名称:row.name,数字化库类型:values["5013001001009002"],标准库功能:values["5013001001009003"],允许作为数据源:values["5013001001009004"]})])
+    const values={"5013001001009001":row.name,"5013001001009002":'数字化库',"5013001001009003":row.is_standard ? '是' : '否',"5013001001009004":row.allow_as_source ? '是' : '否'}
+    await query(`INSERT INTO digital_library_records(id,model_id,project_id,run_id,owner_id,library_name,digital_id,library_id,identifier_values,data) VALUES($1,NULL,NULL,NULL,NULL,'数字化库目录数字化库','5013001001009001','lib-standard-library-catalog',$2,$3) ON CONFLICT(id) DO UPDATE SET identifier_values=EXCLUDED.identifier_values,data=EXCLUDED.data`,[`std-lib-${row.id}`,JSON.stringify(values),JSON.stringify({数字化库名称:row.name,数字化库类型:values["5013001001009002"],数字化库功能:values["5013001001009003"],允许作为数据源:values["5013001001009004"]})])
   }
-  // 标准库现在都有“数据产生模型”。系统初始化/同步产生的基线记录也挂到该模型，避免数字化库出现无来源记录。
+  // 数字化库现在都有“数据产生模型”。系统初始化/同步产生的基线记录也挂到该模型，避免数字化库出现无来源记录。
   // run_id 为空表示系统基线/同步；用户后续新增或修改的标准值通过对应模型运行，run_id 会指向真实模型运行实例。
   await query(`UPDATE digital_library_records d SET model_id=l.model_id,project_id=COALESCE(d.project_id,p.id)
     FROM digital_libraries l LEFT JOIN model_projects p ON p.model_id=l.model_id AND p.status='published'
@@ -331,7 +332,7 @@ async function repairLegacyLibraryIdentifierValues(userId: string, libraryId: st
       const digitalId = str(raw.digitalId).trim()
       const key = str(raw.key).trim()
       const label = str(raw.label).trim()
-      if (!/^\d{16}$/.test(digitalId) || !key || hasBusinessValue(current[digitalId])) continue
+      if (!isDigitalIdentifier(digitalId) || !key || hasBusinessValue(current[digitalId])) continue
       const candidate = hasBusinessValue(merged[key]) ? merged[key] : findByLooseName(merged,label)
       if (hasBusinessValue(candidate)) { current[digitalId] = candidate; changed = true }
     }
@@ -342,7 +343,7 @@ async function repairLegacyLibraryIdentifierValues(userId: string, libraryId: st
     for (const [key,didRaw] of Object.entries(outputMap)) {
       const digitalId = str(didRaw).trim()
       const candidate = hasBusinessValue(runOutput[key]) ? runOutput[key] : (hasBusinessValue(dataOutput[key]) ? dataOutput[key] : merged[key])
-      if (/^\d{16}$/.test(digitalId) && !hasBusinessValue(current[digitalId]) && hasBusinessValue(candidate)) {
+      if (isDigitalIdentifier(digitalId) && !hasBusinessValue(current[digitalId]) && hasBusinessValue(candidate)) {
         current[digitalId] = candidate; changed = true
       }
       if (!hasBusinessValue(runOutput[key]) && hasBusinessValue(candidate)) outputPatch[key] = candidate
@@ -425,8 +426,8 @@ export async function lookupDataLibrary(userId: string, input: LookupInput) {
   if (!library.allow_as_source) throw new ModelBuilderError(409, "该数字化库未开放为模型数据源")
   const sourceDigitalId = String(input.sourceDigitalId ?? input.sourceField ?? "").trim()
   const matchDigitalId = String(input.matchDigitalId ?? input.matchField ?? "").trim()
-  if (!/^\d{16}$/.test(sourceDigitalId)) throw new ModelBuilderError(400, "请选择数据源数字化标识")
-  if (matchDigitalId && !/^\d{16}$/.test(matchDigitalId)) throw new ModelBuilderError(400, "匹配字段必须是16位数字化标识")
+  if (!isDigitalIdentifier(sourceDigitalId)) throw new ModelBuilderError(400, "请选择数据源数字化标识")
+  if (matchDigitalId && !isDigitalIdentifier(matchDigitalId)) throw new ModelBuilderError(400, "匹配字段必须是有效数字化标识")
   const column = await query("SELECT 1 FROM digital_library_columns c JOIN digital_identifiers i ON i.id=c.digital_identifier_id WHERE c.library_id=$1 AND i.code=$2", [library.id, sourceDigitalId])
   if (!column.rowCount) throw new ModelBuilderError(400, "所选数字化标识不属于该数字化库")
   const rowsResult = await query<any>(`SELECT identifier_values FROM digital_library_records WHERE library_id=$1 AND ($3::boolean OR owner_id=$2 OR owner_id IS NULL) ORDER BY created_at DESC LIMIT 1000`, [library.id,userId,Boolean(library.is_standard)])
@@ -460,7 +461,7 @@ export async function ensureModelDigitalLibrary(projectId: string) {
   for (const raw of fields) {
     if (!isRecord(raw) || raw.type === "section") continue
     const digitalId = String(raw.digitalId ?? "").trim()
-    if (!/^\d{16}$/.test(digitalId)) continue
+    if (!isDigitalIdentifier(digitalId)) continue
     const dataType = ["text","textarea","number","date","boolean","user","department","select","radio"].includes(String(raw.type)) ? String(raw.type) : raw.type === "dataSelect" ? "select" : ["checkbox","dataMultiSelect"].includes(String(raw.type)) ? "multiselect" : "json"
     let did = await query<any>("SELECT id FROM digital_identifiers WHERE code=$1", [digitalId])
     let didId = did.rows[0]?.id as string | undefined
@@ -484,7 +485,7 @@ export async function ensureModelDigitalLibrary(projectId: string) {
     : []
   for (const [key,didRaw] of Object.entries(outputMap)) {
     const digitalId = str(didRaw).trim()
-    if (!/^\d{16}$/.test(digitalId)) continue
+    if (!isDigitalIdentifier(digitalId)) continue
     const calc = calculations.find(item => str(item.targetKey) === key)
     const expr = expressions.find(item => str(item.targetKey) === key)
     const displayName = str(calc?.label || expr?.label || key).trim() || key
@@ -517,7 +518,7 @@ export async function buildIdentifierValues(projectId: string, input: Record<str
     const digitalId = String(raw.digitalId ?? "").trim()
     const key = String(raw.key ?? "").trim()
     const label = String(raw.label ?? "").trim()
-    if (!/^\d{16}$/.test(digitalId) || !key) continue
+    if (!isDigitalIdentifier(digitalId) || !key) continue
     const candidate = hasBusinessValue(merged[key]) ? merged[key] : findByLooseName(merged,label)
     if (hasBusinessValue(candidate)) values[digitalId] = candidate
   }
@@ -525,7 +526,7 @@ export async function buildIdentifierValues(projectId: string, input: Record<str
   const map = isRecord(design.outputDigitalMap) ? design.outputDigitalMap : {}
   for (const [key,did] of Object.entries(map)) {
     const digitalId = String(did).trim()
-    if (/^\d{16}$/.test(digitalId) && hasBusinessValue(merged[key])) values[digitalId] = merged[key]
+    if (isDigitalIdentifier(digitalId) && hasBusinessValue(merged[key])) values[digitalId] = merged[key]
   }
   return values
 }

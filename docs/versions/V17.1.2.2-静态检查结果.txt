@@ -1,0 +1,9 @@
+V17.1.2.2 静态检查结果
+日期：2026-09-12
+
+1. TypeScript/TSX 语法转译检查：通过（21 个源码文件）。
+2. server/src/data-linkage.ts：历史记录恢复逻辑已覆盖 input/output、计算字段、outputDigitalMap、记录归属人兜底。
+3. server/src/model-builder.ts：outputDigitalMap 目标自动纳入运行输出；dateDiffInclusive 改为 UTC 纯日期计算。
+4. ensureModelDigitalLibrary：outputDigitalMap 结果自动建立 digital_identifiers 与 digital_library_columns，不再只显示表单字段。
+5. 新增迁移：016_repair_all_legacy_digital_values.sql；用于已执行过 015 的生产数据库继续增量回填。
+6. 未执行 pnpm build:all：当前生成环境无法解析 registry.npmjs.org，依赖无法重新下载安装；生产服务器执行 docker compose up -d --build 时会使用完整依赖进行最终构建。

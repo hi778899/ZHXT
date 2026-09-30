@@ -3,7 +3,7 @@ import { apiFetch } from "./api"
 import { ModelBuilderWorkbench } from "./ModelBuilderWorkbench"
 
 type IconName = "squares" | "plus" | "clock" | "check" | "search" | "chevron" | "bell" | "gear" | "book" | "shield" | "layers" | "file" | "user" | "arrow" | "back" | "close" | "home"
-type View = "dashboard" | "models" | "model-detail" | "todo" | "todo-detail" | "done" | "done-detail" | "construction" | "query" | "query-result" | "information" | "information-detail" | "settings" | "status" | "feature" | "admin" | "login"
+type View = "dashboard" | "models" | "model-detail" | "todo" | "todo-detail" | "done" | "done-detail" | "completed" | "completed-detail" | "construction" | "query" | "query-result" | "information" | "information-detail" | "settings" | "status" | "feature" | "admin" | "login"
 type Model = [string, string, string]
 type LeaveRequest = { leaveType: string; startDate: string; endDate: string; days: number; reason: string }
 type ModelFieldType = "text" | "textarea" | "select" | "radio" | "checkbox" | "dataSelect" | "dataMultiSelect" | "date" | "number" | "boolean" | "user" | "department" | "subform" | "section"
@@ -36,17 +36,17 @@ const modelList: Model[] = [
   ["会议纪要", "会议管理", "根据标准内容、议案结果和会议记录生成会议纪要"],
 ]
 const modelDefinitions: Record<string, ModelDefinition> = {
-  "请休假模型": { kind: "business", code: "5011001005001002", fileName: "5011001005001002-5011002000000001-20260908140000", fields: [{ id: "leave-applicant", label: "申请人", key: "applicant", type: "user", required: false, source: "当前用户", readonly: true }, { id: "leave-department", label: "所属部门", key: "department", type: "department", required: false, readonly: true, source: "员工信息库" }, { id: "leave-type", label: "请假类型", key: "leaveType", type: "select", required: true, options: ["年休假", "事假", "病假", "婚假", "调休"] }, { id: "leave-start", label: "开始日期", key: "startDate", type: "date", required: true }, { id: "leave-end", label: "结束日期", key: "endDate", type: "date", required: true }, { id: "leave-reason", label: "请假事由", key: "reason", type: "textarea", required: true }], formula: "请假天数 = 结束日期 - 开始日期 + 1", explanation: "读取员工与组织信息，计算请假天数，形成请休假业务结果并归档。审批不属于本模型内部节点。", output: "申请数据、请假天数、业务归档结果", storage: "请休假模型数字化库", chain: ["请休假模型", "业务归档", "审批模型"] },
-  "会议议题提报": { kind: "business", code: "5011001006001001", fileName: "5011001006001001-5011002000000001-20260908140000", fields: [{ id: "topic-name", label: "议题名称", key: "topicName", type: "text", required: true }, { id: "meeting-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "meeting-topic", label: "上会依据", key: "meetingBasis", type: "textarea", required: true }, { id: "topic-background", label: "有关背景情况", key: "background", type: "textarea", required: true }, { id: "topic-focus", label: "提请领导重点关注事项", key: "focus", type: "textarea", required: false }, { id: "topic-suggestion", label: "有关工作建议", key: "suggestion", type: "textarea", required: false }, { id: "topic-deadline", label: "此项工作办结时限", key: "deadline", type: "date", required: false }], formula: "IF(会议类型 = 党委会, 党委会议题模板, IF(会议类型 = 董事长专题会, 董事长专题会议题模板, 会议类型对应模板))", explanation: "按会议类型匹配对应议题模板，输入项组成模型结果。", output: "匹配对应会议议题模板、生成文件名", storage: "会议议题提报模型库", chain: ["会议议题提报", "审批模型", "智选模型", "会议收集"] },
-  "会议收集": { kind: "business", code: "5011001006001002", fileName: "5011001006001002-5011002000000001-20260908140000", fields: [{ id: "collect-item", label: "审议事项", key: "reviewItem", type: "textarea", required: true }, { id: "collect-topic", label: "议题名称", key: "topicName", type: "text", required: true }, { id: "collect-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "collect-source", label: "议题来源", key: "topicSource", type: "text", required: false, source: "会议议题提报模型" }], formula: "审议事项 = Read(会议议题提报结果) + Read(议题名称) + Read(会议类型)", explanation: "读取前序议题提报结果，形成可收集的审议事项。", output: "审议事项", storage: "会议收集模型库", chain: ["会议收集", "审批模型", "智选模型", "会议议题编组"] },
-  "会议议题编组": { kind: "business", code: "5011001006001003", fileName: "5011001006001003-5011002000000001-20260908140000", fields: [{ id: "group-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"], source: "会议组织库" }, { id: "group-collection", label: "待上会议题", key: "collectedTopics", type: "textarea", required: true, source: "会议收集库" }, { id: "group-number", label: "议题序号", key: "topicIndex", type: "number", required: false }, { id: "group-item", label: "审议事项", key: "reviewItem", type: "textarea", required: true }], formula: "m = Count(会议收集库)；IF(议题序号 <= m, 输出当前审议事项)", explanation: "按会议类型读取会议组织库和会议收集库，并按数量编组。", output: "会议类型、审议事项", storage: "会议议题编组模型库", chain: ["会议议题编组", "审批模型", "智选模型", "会议议题审定"] },
-  "会议议题审定": { kind: "business", code: "5011001006001004", fileName: "5011001006001004-5011002000000001-20260908140000", fields: [{ id: "review-topic", label: "待审定议题", key: "topic", type: "text", required: true, source: "会议议题编组模型" }, { id: "review-result", label: "审定结果", key: "reviewResult", type: "select", required: true, options: ["通过", "不通过", "退回修改"] }, { id: "review-opinion", label: "审定意见", key: "reviewOpinion", type: "textarea", required: false }], formula: "审定议题 = Read(会议议题编组结果)；输出 = 审定议题", explanation: "对编组中的会议议题进行独立审定，形成后续组织依据。", output: "审定议题", storage: "会议议题审定模型库", chain: ["会议议题审定", "审批模型", "智选模型", "会议组织"] },
-  "会议组织": { kind: "business", code: "5011001006001005", fileName: "5011001006001005-5011002000000001-20260908140000", fields: [{ id: "org-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "org-item", label: "审议事项", key: "reviewItems", type: "textarea", required: true, source: "会议议题编组模型" }, { id: "org-host", label: "会议主持人", key: "host", type: "user", required: true }, { id: "org-time", label: "会议时间", key: "meetingTime", type: "date", required: true }, { id: "org-room", label: "会议室", key: "room", type: "select", required: true, options: ["第一会议室", "第二会议室", "视频会议室"], source: "会议室标准库" }, { id: "org-attendees", label: "会议出席人员", key: "attendees", type: "textarea", required: true, source: "员工信息库" }, { id: "org-reporter", label: "汇报人", key: "reporter", type: "user", required: false, source: "员工信息库" }], formula: "会议组织 = Read(审定议题) + Select(会议时间) + Select(会议室标准库) + Read(员工信息库)", explanation: "汇总审定通过的议题，配置会议主持人、时间、会议室和参会人员。", output: "会议类型、审议事项、会议出席人员、会议时间、会议室、汇报人", storage: "会议组织模型库", chain: ["会议组织", "审批模型", "智选模型", "会议通知"] },
-  "会议通知": { kind: "business", code: "5011001006001006", fileName: "5011001006001006-5011002000000001-20260908140000", fields: [{ id: "notice-content", label: "通知内容", key: "noticeContent", type: "textarea", required: true, source: "会议组织模型" }, { id: "notice-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "notice-time", label: "会议时间", key: "meetingTime", type: "date", required: true }, { id: "notice-scope", label: "通知范围", key: "noticeScope", type: "textarea", required: true }, { id: "notice-attendees", label: "参会人员", key: "attendees", type: "textarea", required: false, source: "员工信息库" }], formula: "会议通知内容 = Build(会议类型, 会议时间, 会议室, 审议事项)；通知范围 = Count(参会人员)", explanation: "读取会议组织结果生成通知内容，并按参会人员形成通知范围。", output: "会议通知内容、通知范围", storage: "会议通知模型库", chain: ["会议通知", "审批模型", "智选模型", "参会反馈"] },
-  "参会反馈": { kind: "business", code: "5011001006001010", fileName: "5011001006001010-5011002000000001-20260908140000", fields: [{ id: "feedback-notice", label: "通知内容", key: "noticeContent", type: "textarea", required: true, source: "会议通知模型" }, { id: "feedback-attend", label: "是否参会", key: "willAttend", type: "select", required: true, options: ["是", "否"] }, { id: "feedback-reason", label: "反馈说明", key: "feedbackReason", type: "textarea", required: false }], formula: "通知内容 = Read(会议通知模型)；IF(是否参会 = 是, 触发参会反馈结果, 记录未参会原因)", explanation: "用户对会议通知进行反馈，反馈结果进入后续会议组织关系。", output: "参会反馈结果", storage: "参会反馈模型库", chain: ["参会反馈", "审批模型", "智选模型", "会议"] },
-  "会议": { kind: "business", code: "5011001006001008", fileName: "5011001006001008-5011002000000001-20260908140000", fields: [{ id: "meeting-display", label: "会议整体展示", key: "meetingOverview", type: "textarea", required: true, source: "会议组织模型" }, { id: "meeting-notice", label: "汇报通知", key: "reportNotice", type: "text", required: false, source: "会议通知模型" }, { id: "meeting-select", label: "选择审议事项", key: "selectedReviewItem", type: "select", required: true, options: ["第一项", "第二项", "第三项"], source: "会议议题编组模型" }], formula: "m = Count(会议通知模型)；IF(n < m, n = n + 1, Show(审议事项))", explanation: "展示会议整体信息，并按序选择需要审议的事项。", output: "会议整体展示、选择审议事项", storage: "会议模型库", chain: ["会议", "审批模型", "智选模型", "会议纪要"] },
-  "会议纪要": { kind: "business", code: "5011001006001009", fileName: "5011001006001009-5011002000000001-20260908140000", fields: [{ id: "minutes-standard", label: "纪要标准内容", key: "standardContent", type: "textarea", required: true, source: "纪要标准内容库" }, { id: "minutes-opinion", label: "议案标准意见", key: "standardOpinion", type: "textarea", required: false, source: "会议纪要标准库" }, { id: "minutes-result", label: "议案结果", key: "motionResult", type: "select", required: true, options: ["同意", "不同意", "会议研究"] }, { id: "minutes-record", label: "会议记录", key: "meetingRecord", type: "textarea", required: true, source: "会议模型" }, { id: "minutes-content", label: "会议纪要", key: "minutes", type: "textarea", required: false }], formula: "审议事项数量 = Count(审议事项)；逐项生成纪要；会议纪要 = 纪要标准内容 + 议案结果 + 会议记录", explanation: "逐项读取议案结果并生成会议纪要，作为会议业务链的收束结果。", output: "会议纪要", storage: "会议纪要模型库", chain: ["会议纪要", "审批模型", "智选模型", "后续业务模型"] },
-  "审批模型": { kind: "approval", code: "5011001005001001", fileName: "5011001005001001-5011002000000001-20260908170000", fields: [{ id: "approval-source", label: "前序业务模型", key: "sourceModelName", type: "text", required: true, readonly: true }, { id: "approval-file", label: "前序模型文件名", key: "sourceFileName", type: "text", required: true, readonly: true }, { id: "approval-display-file", label: "中文显示名称", key: "sourceDisplayFileName", type: "text", required: false, readonly: true }, { id: "approval-digital-id", label: "前序数字化标识", key: "sourceDigitalId", type: "text", required: true, readonly: true }], formula: "按审批模型配置形成并执行本次审批路径", explanation: "审批模型是面向所有业务模型的通用管控模型，不固化某个业务模型的专用字段。", output: "审批过程、审批意见、审批结果", storage: "审批模型数字化库", chain: ["任一业务模型", "审批模型", "智选模型"] },
+  "请休假模型": { kind: "business", code: "5011001005001000001", fileName: "5011001005001000001-5011002000000001-20260908140000", fields: [{ id: "leave-applicant", label: "申请人", key: "applicant", type: "user", required: false, source: "当前用户", readonly: true }, { id: "leave-department", label: "所属部门", key: "department", type: "department", required: false, readonly: true, source: "人员信息数字化库" }, { id: "leave-type", label: "请假类型", key: "leaveType", type: "select", required: true, options: ["年休假", "事假", "病假", "婚假", "调休"] }, { id: "leave-start", label: "开始日期", key: "startDate", type: "date", required: true }, { id: "leave-end", label: "结束日期", key: "endDate", type: "date", required: true }, { id: "leave-reason", label: "请假事由", key: "reason", type: "textarea", required: true }], formula: "请假天数 = 结束日期 - 开始日期 + 1", explanation: "读取员工与组织信息，计算请假天数，形成请休假业务结果并归档。审批不属于本模型内部节点。", output: "申请数据、请假天数、业务归档结果", storage: "请休假模型数字化库", chain: ["请休假模型", "业务归档", "审批模型"] },
+  "会议议题提报": { kind: "business", code: "5011001006001001", fileName: "5011001006001001-5011002000000001-20260908140000", fields: [{ id: "topic-name", label: "议题名称", key: "topicName", type: "text", required: true }, { id: "meeting-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "meeting-topic", label: "上会依据", key: "meetingBasis", type: "textarea", required: true }, { id: "topic-background", label: "有关背景情况", key: "background", type: "textarea", required: true }, { id: "topic-focus", label: "提请领导重点关注事项", key: "focus", type: "textarea", required: false }, { id: "topic-suggestion", label: "有关工作建议", key: "suggestion", type: "textarea", required: false }, { id: "topic-deadline", label: "此项工作办结时限", key: "deadline", type: "date", required: false }], formula: "IF(会议类型 = 党委会, 党委会议题模板, IF(会议类型 = 董事长专题会, 董事长专题会议题模板, 会议类型对应模板))", explanation: "按会议类型匹配对应议题模板，输入项组成模型结果。", output: "匹配对应会议议题模板、生成文件名", storage: "会议议题提报数字化库", chain: ["会议议题提报", "审批模型", "智选模型", "会议收集"] },
+  "会议收集": { kind: "business", code: "5011001006001002", fileName: "5011001006001002-5011002000000001-20260908140000", fields: [{ id: "collect-item", label: "审议事项", key: "reviewItem", type: "textarea", required: true }, { id: "collect-topic", label: "议题名称", key: "topicName", type: "text", required: true }, { id: "collect-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "collect-source", label: "议题来源", key: "topicSource", type: "text", required: false, source: "会议议题提报模型" }], formula: "审议事项 = Read(会议议题提报结果) + Read(议题名称) + Read(会议类型)", explanation: "读取前序议题提报结果，形成可收集的审议事项。", output: "审议事项", storage: "会议收集数字化库", chain: ["会议收集", "审批模型", "智选模型", "会议议题编组"] },
+  "会议议题编组": { kind: "business", code: "5011001006001003", fileName: "5011001006001003-5011002000000001-20260908140000", fields: [{ id: "group-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"], source: "会议组织数字化库" }, { id: "group-collection", label: "待上会议题", key: "collectedTopics", type: "textarea", required: true, source: "会议收集数字化库" }, { id: "group-number", label: "议题序号", key: "topicIndex", type: "number", required: false }, { id: "group-item", label: "审议事项", key: "reviewItem", type: "textarea", required: true }], formula: "m = Count(会议收集数字化库)；IF(议题序号 <= m, 输出当前审议事项)", explanation: "按会议类型读取会议组织数字化库和会议收集数字化库，并按数量编组。", output: "会议类型、审议事项", storage: "会议议题编组数字化库", chain: ["会议议题编组", "审批模型", "智选模型", "会议议题审定"] },
+  "会议议题审定": { kind: "business", code: "5011001006001004", fileName: "5011001006001004-5011002000000001-20260908140000", fields: [{ id: "review-topic", label: "待审定议题", key: "topic", type: "text", required: true, source: "会议议题编组模型" }, { id: "review-result", label: "审定结果", key: "reviewResult", type: "select", required: true, options: ["通过", "不通过", "退回修改"] }, { id: "review-opinion", label: "审定意见", key: "reviewOpinion", type: "textarea", required: false }], formula: "审定议题 = Read(会议议题编组结果)；输出 = 审定议题", explanation: "对编组中的会议议题进行独立审定，形成后续组织依据。", output: "审定议题", storage: "会议议题审定数字化库", chain: ["会议议题审定", "审批模型", "智选模型", "会议组织"] },
+  "会议组织": { kind: "business", code: "5011001006001005", fileName: "5011001006001005-5011002000000001-20260908140000", fields: [{ id: "org-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "org-item", label: "审议事项", key: "reviewItems", type: "textarea", required: true, source: "会议议题编组模型" }, { id: "org-host", label: "会议主持人", key: "host", type: "user", required: true }, { id: "org-time", label: "会议时间", key: "meetingTime", type: "date", required: true }, { id: "org-room", label: "会议室", key: "room", type: "select", required: true, options: ["第一会议室", "第二会议室", "视频会议室"], source: "会议室数字化库" }, { id: "org-attendees", label: "会议出席人员", key: "attendees", type: "textarea", required: true, source: "人员信息数字化库" }, { id: "org-reporter", label: "汇报人", key: "reporter", type: "user", required: false, source: "人员信息数字化库" }], formula: "会议组织 = Read(审定议题) + Select(会议时间) + Select(会议室数字化库) + Read(人员信息数字化库)", explanation: "汇总审定通过的议题，配置会议主持人、时间、会议室和参会人员。", output: "会议类型、审议事项、会议出席人员、会议时间、会议室、汇报人", storage: "会议组织数字化库", chain: ["会议组织", "审批模型", "智选模型", "会议通知"] },
+  "会议通知": { kind: "business", code: "5011001006001006", fileName: "5011001006001006-5011002000000001-20260908140000", fields: [{ id: "notice-content", label: "通知内容", key: "noticeContent", type: "textarea", required: true, source: "会议组织模型" }, { id: "notice-type", label: "会议类型", key: "meetingType", type: "select", required: true, options: ["党委会", "董事长专题会", "总经理办公会", "采购管理委员会"] }, { id: "notice-time", label: "会议时间", key: "meetingTime", type: "date", required: true }, { id: "notice-scope", label: "通知范围", key: "noticeScope", type: "textarea", required: true }, { id: "notice-attendees", label: "参会人员", key: "attendees", type: "textarea", required: false, source: "人员信息数字化库" }], formula: "会议通知内容 = Build(会议类型, 会议时间, 会议室, 审议事项)；通知范围 = Count(参会人员)", explanation: "读取会议组织结果生成通知内容，并按参会人员形成通知范围。", output: "会议通知内容、通知范围", storage: "会议通知数字化库", chain: ["会议通知", "审批模型", "智选模型", "参会反馈"] },
+  "参会反馈": { kind: "business", code: "5011001006001010", fileName: "5011001006001010-5011002000000001-20260908140000", fields: [{ id: "feedback-notice", label: "通知内容", key: "noticeContent", type: "textarea", required: true, source: "会议通知模型" }, { id: "feedback-attend", label: "是否参会", key: "willAttend", type: "select", required: true, options: ["是", "否"] }, { id: "feedback-reason", label: "反馈说明", key: "feedbackReason", type: "textarea", required: false }], formula: "通知内容 = Read(会议通知模型)；IF(是否参会 = 是, 触发参会反馈结果, 记录未参会原因)", explanation: "用户对会议通知进行反馈，反馈结果进入后续会议组织关系。", output: "参会反馈结果", storage: "参会反馈数字化库", chain: ["参会反馈", "审批模型", "智选模型", "会议"] },
+  "会议": { kind: "business", code: "5011001006001008", fileName: "5011001006001008-5011002000000001-20260908140000", fields: [{ id: "meeting-display", label: "会议整体展示", key: "meetingOverview", type: "textarea", required: true, source: "会议组织模型" }, { id: "meeting-notice", label: "汇报通知", key: "reportNotice", type: "text", required: false, source: "会议通知模型" }, { id: "meeting-select", label: "选择审议事项", key: "selectedReviewItem", type: "select", required: true, options: ["第一项", "第二项", "第三项"], source: "会议议题编组模型" }], formula: "m = Count(会议通知模型)；IF(n < m, n = n + 1, Show(审议事项))", explanation: "展示会议整体信息，并按序选择需要审议的事项。", output: "会议整体展示、选择审议事项", storage: "会议数字化库", chain: ["会议", "审批模型", "智选模型", "会议纪要"] },
+  "会议纪要": { kind: "business", code: "5011001006001009", fileName: "5011001006001009-5011002000000001-20260908140000", fields: [{ id: "minutes-standard", label: "纪要标准内容", key: "standardContent", type: "textarea", required: true, source: "纪要标准内容数字化库" }, { id: "minutes-opinion", label: "议案标准意见", key: "standardOpinion", type: "textarea", required: false, source: "会议纪要数字化库" }, { id: "minutes-result", label: "议案结果", key: "motionResult", type: "select", required: true, options: ["同意", "不同意", "会议研究"] }, { id: "minutes-record", label: "会议记录", key: "meetingRecord", type: "textarea", required: true, source: "会议模型" }, { id: "minutes-content", label: "会议纪要", key: "minutes", type: "textarea", required: false }], formula: "审议事项数量 = Count(审议事项)；逐项生成纪要；会议纪要 = 纪要标准内容 + 议案结果 + 会议记录", explanation: "逐项读取议案结果并生成会议纪要，作为会议业务链的收束结果。", output: "会议纪要", storage: "会议纪要数字化库", chain: ["会议纪要", "审批模型", "智选模型", "后续业务模型"] },
+  "审批模型": { kind: "approval", code: "5011001005001001", fileName: "5011001005001001-5011002000000001-20260908170000", fields: [{ id: "approval-source", label: "前序业务模型", key: "前序业务模型", type: "text", required: true, readonly: true }, { id: "approval-file", label: "前序模型文件名", key: "前序模型文件名", type: "text", required: true, readonly: true }, { id: "approval-display-file", label: "中文显示名称", key: "中文显示名称", type: "text", required: false, readonly: true }, { id: "approval-digital-id", label: "前序数字化标识", key: "前序数字化标识", type: "text", required: true, readonly: true }], formula: "按审批模型配置形成并执行本次审批路径", explanation: "审批模型是面向所有业务模型的通用管控模型，不固化某个业务模型的专用字段。", output: "审批过程、审批意见、审批结果", storage: "审批模型数字化库", chain: ["任一业务模型", "审批模型", "智选模型"] },
   "智选模型": { kind: "smart", code: "5011001005001003", fileName: "5011001005001003-5011002000000001-20260908170000", fields: [{ id: "smart-model", label: "业务模型", key: "businessSourceModelName", type: "text", required: true, readonly: true }, { id: "smart-file", label: "文件名", key: "businessFileName", type: "text", required: true, readonly: true }, { id: "smart-display-file", label: "中文显示名称", key: "businessDisplayFileName", type: "text", required: true, readonly: true }, { id: "smart-id", label: "数字化标识", key: "businessDigitalId", type: "text", required: true, readonly: true }, { id: "smart-related-id", label: "关联数字化标识", key: "associatedDigitalIds", type: "text", required: false, readonly: true }, { id: "smart-result", label: "审批结果", key: "approvalResult", type: "text", required: false, readonly: true, source: "审批模型" }], formula: "读取业务模型文件名与数字化标识 → 查询业务模型配置的标识关联关系 → 判断是否触发后续业务模型", explanation: "智选模型是面向所有业务模型的通用智能关联模型，只读取业务对象引用、审批结果和标识关联配置，不固化具体业务字段。", output: "业务文件名、中文显示名称、数字化标识、关联数字化标识、智选判断、后续关联模型", storage: "智选模型数字化库", chain: ["任一业务模型", "审批模型", "智选模型", "按业务模型标识关联结果决定后续模型"] },
 }
 const initialTodos = [
@@ -58,11 +58,8 @@ const initialTodos = [
 
 ]
 type TodoItem = typeof initialTodos[number]
-type DoneRecord = TodoItem & { content?: string; result: string; handled: string; handled_result?: string; handled_at?: string; record_kind?: "handled" | "launched" | "approval_run" | "cluster" }
-type ModelClusterApprovalStep = { stepIndex:number; step:string; approver:string; status:string; result:string; handledAt:string }
-type ModelClusterApproval = { runId:string; fileName:string; displayFileName:string; status:string; result:string; output:Record<string,unknown>; progress:ModelClusterApprovalStep[] }
-type ModelClusterSmart = { runId:string; fileName:string; displayFileName:string; status:string; result:string; output:Record<string,unknown> }
-type ModelClusterContent = { rootRunId:string; fileName:string; displayFileName:string; digitalId:string; businessStatus:string; input:Record<string,unknown>; output:Record<string,unknown>; approval:ModelClusterApproval|null; smart:ModelClusterSmart|null }
+type DoneRecord = TodoItem & { content?: string; result: string; handled: string; handled_result?: string; handled_at?: string; record_kind?: "handled" | "launched" | "approval_run" | "cluster" | "completed_run" }
+type DashboardMetrics = { todayCompleted:number; todayWorkRecords:number; todayHandled:number; rank:number; activeUsers:number; rankLabel:string }
 const notices = [["关于驾驶舱要素调整的通知", "通知", "2026-09-01"], ["模型建设阶段说明更新", "说明", "2026-08-30"], ["数字化库使用指引发布", "指引", "2026-08-28"], ["系统维护安排", "通知", "2026-08-24"], ["公共信息阅读提醒", "提醒", "2026-08-22"], ["驾驶舱功能优化公告", "公告", "2026-08-20"], ["本月模型运行情况汇总", "汇总", "2026-08-18"]]
 function dedupeNoticeRows<T extends { title: string; type: string; date: string }>(items: T[]) {
   const seen = new Set<string>()
@@ -73,13 +70,17 @@ function dedupeNoticeRows<T extends { title: string; type: string; date: string 
     return true
   })
 }
-const titles: Record<View, string> = { dashboard: "驾驶舱", models: "可发起模型", "model-detail": "发起模型", todo: "我的待办", "todo-detail": "事项办理", done: "我的已办", "done-detail": "已办详情", construction: "模型建设工作台", query: "数字化库", "query-result": "数字化库", information: "公共信息", "information-detail": "信息详情", settings: "个人设置", status: "系统运行状态", feature: "功能工作区", admin: "管理后台", login: "用户登录" }
+const titles: Record<View, string> = { dashboard: "驾驶舱", models: "可发起模型", "model-detail": "发起模型", todo: "我的待办", "todo-detail": "事项办理", done: "我的已办", "done-detail": "已办详情", completed: "我的办结", "completed-detail": "模型详情", construction: "模型建设工作台", query: "数字化库", "query-result": "数字化库", information: "公共信息", "information-detail": "信息详情", settings: "个人设置", status: "系统运行状态", feature: "功能工作区", admin: "管理后台", login: "用户登录" }
 
 export default function App() {
   const [view, setView] = useState<View>("login")
   const [previous, setPrevious] = useState<View>("dashboard")
   const [todos, setTodos] = useState(initialTodos)
   const [done, setDone] = useState<DoneRecord[]>([{ ...initialTodos[4], result: "已阅读", handled: "2026-08-30 16:20", record_kind: "handled" }])
+  const [selectedDone, setSelectedDone] = useState<DoneRecord | null>(null)
+  const [completed, setCompleted] = useState<DoneRecord[]>([])
+  const [selectedCompleted, setSelectedCompleted] = useState<DoneRecord | null>(null)
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>({ todayCompleted:0, todayWorkRecords:0, todayHandled:0, rank:0, activeUsers:0, rankLabel:"今日数字化成果数排名" })
   const [selectedTodo, setSelectedTodo] = useState(initialTodos[0])
   const [selectedModel, setSelectedModel] = useState<Model>(modelList[0])
   const [selectedNotice, setSelectedNotice] = useState(notices[0])
@@ -90,9 +91,16 @@ export default function App() {
   const [userOpen, setUserOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{id:string;username:string;displayName:string;department:string;role:string} | null>(null)
+  const refreshDashboard = async () => {
+    const data = await apiFetch<{ todos: typeof initialTodos; done: Array<TodoItem & { content?: string; handled_result?: string; handled_at?: string; record_kind?: "handled" | "launched" | "approval_run" | "cluster" | "completed_run" }>; completed: Array<TodoItem & { content?: string; handled_result?: string; handled_at?: string; record_kind?: "completed_run" }>; metrics: DashboardMetrics }>("/api/dashboard")
+    setTodos(data.todos)
+    setDone(data.done.map(item => ({ ...item, result: item.handled_result ?? "已完成", handled: item.handled_at ?? item.date })))
+    setCompleted((data.completed ?? []).map(item => ({ ...item, result:item.handled_result ?? "已办结", handled:item.handled_at ?? item.date })))
+    if (data.metrics) setDashboardMetrics(data.metrics)
+  }
   useEffect(() => { if (toast) { const t = window.setTimeout(() => setToast(""), 2200); return () => window.clearTimeout(t) } }, [toast])
   useEffect(() => { apiFetch<{user:NonNullable<typeof currentUser> }>("/api/auth/me").then(({user}) => { setCurrentUser(user); setView("dashboard") }).catch(() => undefined) }, [])
-  useEffect(() => { if (!["dashboard", "todo", "done"].includes(view)) return; apiFetch<{ todos: typeof initialTodos; done: Array<TodoItem & { content?: string; handled_result?: string; handled_at?: string; record_kind?: "handled" | "launched" | "approval_run" | "cluster" }> }>("/api/dashboard").then(data => { setTodos(data.todos); setDone(data.done.map(item => ({ ...item, result: item.handled_result ?? "已完成", handled: item.handled_at ?? item.date }))) }).catch(() => undefined) }, [view])
+  useEffect(() => { if (!["dashboard", "todo", "done", "completed"].includes(view)) return; void refreshDashboard().catch(() => undefined) }, [view])
   useEffect(() => { if (view !== "dashboard") return; apiFetch<{ notices: Array<{ title:string; type:string; date:string }> }>("/api/notices").then(data => setNoticeList(dedupeNoticeRows(data.notices).map(item => [item.title, item.type, item.date]))).catch(() => undefined) }, [view])
   const navigate = (next: View) => { setPrevious(view); setView(next); setNotificationOpen(false); setUserOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }) }
   const openTodo = (item: typeof initialTodos[number]) => { setSelectedTodo(item); navigate("todo-detail") }
@@ -112,8 +120,12 @@ export default function App() {
         if (response.triggerError) setToast(`审批已完成，但后续模型触发失败：${response.triggerError}`)
       } catch (error) { setToast(error instanceof Error ? error.message : "办理失败"); return }
     }
-    setTodos(v => { const rest = v.filter(x => x.id !== selectedTodo.id); return nextTodo ? [nextTodo, ...rest.filter(x => x.id !== nextTodo!.id)] : rest })
-    setDone(v => [{ ...selectedTodo, result, handled: new Date().toISOString().slice(0,16).replace("T"," ") }, ...v])
+    if (selectedTodo.id.startsWith("local-")) {
+      setTodos(v => { const rest = v.filter(x => x.id !== selectedTodo.id); return nextTodo ? [nextTodo, ...rest.filter(x => x.id !== nextTodo!.id)] : rest })
+      setDone(v => [{ ...selectedTodo, result, handled: new Date().toISOString().slice(0,16).replace("T"," ") }, ...v])
+    } else {
+      try { await refreshDashboard() } catch { /* 页面切换后还会再次按真实服务端状态刷新 */ }
+    }
     if (smartTask) setToast("智选结果已确认，记录已进入我的已办")
     else if (!nextTodo) setToast(triggeredModel ? `审批模型已归档，并已触发${triggeredModel}` : completed ? `审批模型处理完成：${result}` : `当前审批环节已完成：${result}`)
     else setToast("当前审批环节已完成，审批模型已生成下一环节待办")
@@ -127,25 +139,27 @@ export default function App() {
     {notificationOpen && <Popover className="right-28 top-[58px] w-[330px]"><h3>通知中心</h3><p className="mt-3 rounded-lg bg-[#f0f5fd] p-3 text-sm">您有 {todos.length} 项待办需要处理。</p><button onClick={() => navigate("todo")} className="link mt-3">查看全部通知</button></Popover>}
     {userOpen && <Popover className="right-5 top-[58px] w-[220px]"><div className="flex items-center gap-3"><span className="avatar">{(currentUser?.displayName ?? "张珊").slice(0, 1)}</span><div><b>{currentUser?.displayName ?? "张珊"}</b><p className="muted">当前用户</p></div></div><button onClick={() => navigate("settings")} className="menu-button">个人设置</button><button onClick={() => setLogoutOpen(true)} className="menu-button text-[#c44949]">退出登录</button></Popover>}
     <TopNav view={view} navigate={navigate} isAdmin={currentUser?.role === "admin"} />
-    {view === "dashboard" ? <Dashboard todos={todos} notices={noticeList} openTodo={openTodo} navigate={navigate} openFeature={openFeature} setSelectedNotice={setSelectedNotice} /> : <Workspace title={titles[view]} onBack={() => setView(previous === view ? "dashboard" : previous)} onHome={() => navigate("dashboard")}>
+    {view === "dashboard" ? <Dashboard todos={todos} done={done} completed={completed} metrics={dashboardMetrics} openTodo={openTodo} navigate={navigate} /> : <Workspace title={titles[view]} onBack={() => setView(previous === view ? "dashboard" : previous)} onHome={() => navigate("dashboard")}>
       {view === "models" && <Models onSelect={openModel} />}
-      {view === "model-detail" && <ModelDetail model={selectedModel} requester={currentUser?.displayName ?? "张珊"} onStart={async (request, run) => {
+      {view === "model-detail" && <ModelDetail model={selectedModel} requester={currentUser?.displayName ?? "张珊"} requesterDepartment={currentUser?.department ?? ""} onStart={async (request, run) => {
         if (request) {
           const response = await apiFetch<{ todo?: typeof initialTodos[number] | null; archived?: boolean; triggeredModel?: string; triggerError?: string }>("/api/leave-requests", { method: "POST", body: JSON.stringify(request) })
           if (response.todo) setTodos(items => [response.todo!, ...items.filter(x => x.id !== response.todo!.id)])
           setToast(response.triggerError ? `请休假模型已归档，但审批模型触发失败：${response.triggerError}` : response.triggeredModel ? `请休假模型已归档，并已触发${response.triggeredModel}` : "请休假模型已归档")
-          navigate(response.todo ? "todo" : "done")
+          navigate(response.todo ? "todo" : "completed")
         } else if (run) {
           const response = await apiFetch<{ todo?: typeof initialTodos[number] | null; archived?: boolean; triggeredModel?: string; triggerError?: string }>("/api/model-runs", { method: "POST", body: JSON.stringify(run) })
           if (response.todo) setTodos(items => [response.todo!, ...items.filter(x => x.id !== response.todo!.id)])
           setToast(response.triggerError ? `${run.modelName}已归档，但后续模型触发失败：${response.triggerError}` : response.triggeredModel ? `${run.modelName}已归档，并已触发${response.triggeredModel}` : `${run.modelName}已运行并归档`)
-          navigate(response.todo ? "todo" : "done")
+          navigate(response.todo ? "todo" : "completed")
         }
       }} />}
       {view === "todo" && <TodoTable items={todos} openTodo={openTodo} />}
       {view === "todo-detail" && <TodoDetail item={selectedTodo} onFinish={finishTodo} onSave={() => setToast("办理内容已保存")} />}
-      {view === "done" && <DoneTable items={done} onOpen={(item) => { setSelectedTodo(item); navigate("done-detail") }} />}
-      {view === "done-detail" && <DoneDetail item={done.find(x => x.id === selectedTodo.id) || done[0]} />}
+      {view === "done" && <HandledTable items={done} onOpen={(item) => { setSelectedDone(item); navigate("done-detail") }} />}
+      {view === "done-detail" && <HandledDetail item={selectedDone ?? done[0]} onOpenModel={x=>{setSelectedDone(x); setView("done-detail")}} />}
+      {view === "completed" && <CompletedTable items={completed} onOpen={(item) => { setSelectedCompleted(item); navigate("completed-detail") }} />}
+      {view === "completed-detail" && <CompletedDetail item={selectedCompleted ?? completed[0]} onOpenModel={(item) => { setSelectedCompleted(item); setView("completed-detail") }} />}
       {view === "construction" && <ModelBuilderWorkbench onToast={setToast} onLaunch={(name) => openModel(modelList.find(item => item[0] === name) ?? [name, "业务管理", "通过模型建设四阶段创建并发布的模型"])} />} 
       {view === "query" && <DigitalLibrary />}
       {view === "information" && <Information items={noticeList} onOpen={(n) => { setSelectedNotice(n); navigate("information-detail") }} />}
@@ -159,25 +173,37 @@ export default function App() {
 }
 
 function Header({ title, userName, onHome, onNotify, onSettings, onUser, onLogout, onAdmin }: { title: string; userName: string; onHome: () => void; onNotify: () => void; onSettings: () => void; onUser: () => void; onLogout: () => void; onAdmin?: () => void }) { return <header className="relative z-30 flex h-[62px] items-center bg-[#475aad] px-5 text-white md:px-8"><button onClick={onHome} className="flex items-center gap-3 rounded-lg p-1.5 hover:bg-white/10"><span className="grid size-8 place-items-center rounded-lg bg-white text-[#5062b1]"><Icon name="squares" size={18}/></span><span className="hidden font-semibold tracking-[.08em] sm:inline">公司标识</span></button><div className="mx-5 hidden h-6 w-px bg-white/25 md:block"/><h1 className="text-base font-semibold tracking-[.08em] md:text-lg">{title}</h1><div className="ml-auto flex items-center gap-1">{onAdmin && <button onClick={onAdmin} className="hidden rounded-lg px-3 py-2 text-sm text-white/90 hover:bg-white/10 md:block">管理后台</button>}<button aria-label="通知" onClick={onNotify} className="header-icon"><Icon name="bell"/></button><button aria-label="设置" onClick={onSettings} className="header-icon"><Icon name="gear"/></button><button onClick={onUser} className="ml-2 flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10"><span className="avatar small">{userName.slice(0, 1)}</span><span className="hidden text-left text-sm md:block"><b className="block font-medium">{userName}</b><small className="text-white/70">当前用户</small></span></button><button onClick={onLogout} className="ml-1 hidden rounded-lg px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white sm:block">退出</button></div></header> }
-function TopNav({ view, navigate, isAdmin }: { view: View; navigate: (v: View) => void; isAdmin?: boolean }) { const items: [string, View][] = [["驾驶舱", "dashboard"], ["数字化库", "query"], ["我的待办", "todo"], ["我的已办", "done"], ["模型建设", "construction"], ["公共信息", "information"], ...(isAdmin ? [["管理后台", "admin"] as [string, View]] : [])]; return <nav className="sticky top-0 z-20 flex h-11 overflow-x-auto bg-[#394b98] px-3 text-white md:px-6">{items.map(([label, target]) => <button key={label} onClick={() => navigate(target)} className={`relative min-w-[112px] px-4 text-sm transition ${view === target || (view === "todo-detail" && target === "todo") || (view === "information-detail" && target === "information") ? "bg-[#6578bd] font-semibold after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-[#78c7ff]" : "text-white/88 hover:bg-white/10"}`}>{label}</button>)}</nav> }
+function TopNav({ view, navigate, isAdmin }: { view: View; navigate: (v: View) => void; isAdmin?: boolean }) { const items: [string, View][] = [["驾驶舱", "dashboard"], ["数字化库", "query"], ["我的待办", "todo"], ["我的已办", "done"], ["我的办结", "completed"], ["模型建设", "construction"], ["公共信息", "information"], ...(isAdmin ? [["管理后台", "admin"] as [string, View]] : [])]; return <nav className="sticky top-0 z-20 flex h-11 overflow-x-auto bg-[#394b98] px-3 text-white md:px-6">{items.map(([label, target]) => <button key={label} onClick={() => navigate(target)} className={`relative min-w-[112px] px-4 text-sm transition ${view === target || (view === "todo-detail" && target === "todo") || (view === "done-detail" && target === "done") || (view === "completed-detail" && target === "completed") || (view === "information-detail" && target === "information") ? "bg-[#6578bd] font-semibold after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-[#78c7ff]" : "text-white/88 hover:bg-white/10"}`}>{label}</button>)}</nav> }
 
-function Dashboard({ todos, openTodo, navigate }: { todos: typeof initialTodos; notices: string[][]; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void; openFeature: (x: string) => void; setSelectedNotice: (x: string[]) => void }) {
-  const recentModels = modelList.slice(0, 6)
-  return <main className="dashboard-home p-4 md:p-6">
-    <section className="dashboard-welcome"><div><span className="status status-accent">个人工作驾驶舱</span><h2>今天需要处理什么？</h2><p>从待办、模型和建设入口开始，其他信息按需进入对应工作区。</p></div><button onClick={() => navigate("models")} className="btn-primary"><Icon name="plus" size={16}/>发起模型</button></section>
-    <section className="dashboard-stat-strip"><div><span className="dashboard-stat-icon"><Icon name="clock" size={17}/></span><span><small>待处理事项</small><b>{todos.length}</b></span></div><div><span className="dashboard-stat-icon"><Icon name="layers" size={17}/></span><span><small>可发起模型</small><b>{modelList.length}</b></span></div><div><span className="dashboard-stat-icon"><Icon name="shield" size={17}/></span><span><small>系统运行状态</small><b className="healthy">正常</b></span></div></section>
-    <div className="dashboard-home-grid"><div className="dashboard-home-main">
-      <section className="compact-panel"><div className="compact-panel-head"><div><b>快捷入口</b><span>保留高频操作</span></div><span className="muted">个人工作区</span></div><div className="quick-entry-grid"><button onClick={() => navigate("models")}><span><Icon name="plus" size={19}/></span><b>发起模型</b><small>从可发起模型开始</small></button><button onClick={() => navigate("construction")}><span><Icon name="gear" size={19}/></span><b>建设模型</b><small>拖拽设计并发布</small></button><button onClick={() => navigate("todo")}><span><Icon name="clock" size={19}/></span><b>处理待办</b><small>{todos.length} 项待处理</small></button><button onClick={() => navigate("query")}><span><Icon name="layers" size={19}/></span><b>数字化库</b><small>查看模型运行入库记录</small></button></div></section>
-      <section className="compact-panel"><div className="compact-panel-head"><div><b>可发起模型</b><span>按业务场景选择，其他模型进入模型列表查看</span></div><button onClick={() => navigate("models")} className="link">查看全部 →</button></div><div className="dashboard-model-grid">{recentModels.map(model => <button key={model[0]} onClick={() => navigate("models")} className="dashboard-model-item"><span className="dashboard-model-icon"><Icon name={model[0] === leaveModel[0] ? "clock" : "layers"} size={17}/></span><span><b>{model[0]}</b><small>{model[1]}</small></span><Icon name="chevron" size={14}/></button>)}</div></section>
-    </div><aside className="compact-panel dashboard-home-tasks"><div className="compact-panel-head"><div><b>我的待办</b><span>需要你处理的事项</span></div><span className="status warning">{todos.length} 项</span></div><div className="dashboard-task-list">{todos.slice(0, 5).map(item => <button key={item.id} onClick={() => openTodo(item)}><span><b>{item.title}</b><small>{item.model} · {item.date}</small></span><Icon name="chevron" size={15}/></button>)}{todos.length === 0 && <Empty text="当前没有待办事项" />}</div><button onClick={() => navigate("todo")} className="link dashboard-task-more">查看全部待办 →</button></aside></div>
-    <section className="dashboard-flow"><div><span className="dashboard-flow-label">标准运行单元</span><b>业务模型</b><Icon name="arrow" size={14}/><b>审批模型</b><Icon name="arrow" size={14}/><b>智选模型</b><Icon name="arrow" size={14}/><b>后续业务模型</b></div><small>业务数据、审批结论和后续启动条件按数字化标识自动衔接</small></section>
+function Dashboard({ todos, done, completed, metrics, openTodo, navigate }: { todos: typeof initialTodos; done: DoneRecord[]; completed: DoneRecord[]; metrics: DashboardMetrics; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void }) {
+  return <main className="dashboard-home dashboard-workbench p-4 md:p-6">
+    <section className="dashboard-welcome"><div><span className="status status-accent">个人工作台</span><h2>工作台</h2><p>集中处理个人事项、发起业务、查看工作进展，并快速进入常用功能。</p></div><button onClick={() => navigate("models")} className="btn-primary"><Icon name="plus" size={16}/>发起业务</button></section>
+
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>快捷入口</h3></div></div><div className="dashboard-rule-grid interaction-grid">
+      <button className="dashboard-rule-card" onClick={() => navigate("models")}><span className="dashboard-rule-icon"><Icon name="layers" size={20}/></span><div><small>业务办理</small><b>发起业务</b><p>进入本人有权使用的已发布模型</p></div><Icon name="chevron" size={16}/></button>
+      <button className="dashboard-rule-card" onClick={() => navigate("construction")}><span className="dashboard-rule-icon"><Icon name="gear" size={20}/></span><div><small>系统配置</small><b>模型建设</b><p>业务定义 → 数字化定义 → 模型设计 → 模型发布</p></div><Icon name="chevron" size={16}/></button>
+    </div></section>
+
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>我的事项</h3></div></div><div className="dashboard-feedback-grid">
+      <button onClick={() => navigate("todo")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="clock" size={19}/></span><small>当前需要本人处理</small><b>我的待办</b><strong>{todos.length}</strong></button>
+      <button onClick={() => navigate("done")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="check" size={19}/></span><small>本人已经处理的任务/环节</small><b>我的已办</b><strong>{done.length}</strong></button>
+      <button onClick={() => navigate("completed")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="file" size={19}/></span><small>已经完成归档的模型记录</small><b>我的办结</b><strong>{completed.length}</strong></button>
+    </div><div className="dashboard-feedback-list"><div className="compact-panel-head"><div><b>待办事项</b><span>优先展示最近到达的个人待办</span></div><button onClick={() => navigate("todo")} className="link">查看全部 →</button></div><div className="dashboard-task-list">{todos.slice(0,4).map(item => <button key={item.id} onClick={() => openTodo(item)}><span><b>{item.title}</b><small>{item.model} · {item.date}</small></span><Icon name="chevron" size={15}/></button>)}{todos.length === 0 && <Empty text="当前没有待办事项" />}</div></div></section>
+
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>工作概览</h3></div></div><div className="dashboard-constraint-grid">
+      <div className="constraint-card"><small>今日办结</small><b>{metrics.todayCompleted}</b><span>已完成归档的模型记录</span></div>
+      <div className="constraint-card"><small>今日工作记录</small><b>{metrics.todayWorkRecords}</b><span>本人数字化库有效入库记录</span></div>
+      <div className="constraint-card"><small>今日已办理</small><b>{metrics.todayHandled}</b><span>本人完成的办理动作</span></div>
+      <div className="constraint-card"><small>{metrics.rankLabel}</small><b>{metrics.rank > 0 ? `第 ${metrics.rank} 名` : "暂无"}</b><span>{metrics.activeUsers > 0 ? `今日参与统计 ${metrics.activeUsers} 人` : "今日暂无可排名记录"}</span></div>
+    </div></section>
+
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>常用服务</h3></div></div><div className="dashboard-resource-row"><button onClick={() => navigate("query")}>数字化库</button><button onClick={() => navigate("information")}>公共信息</button><button onClick={() => navigate("models")}>可发起模型</button></div></section>
   </main>
 }
-
 function LegacyDashboard({ todos, notices: dashboardNotices, openTodo, navigate, openFeature, setSelectedNotice }: { todos: typeof initialTodos; notices: string[][]; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void; openFeature: (x: string) => void; setSelectedNotice: (x: string[]) => void }) {
   const [taskTab, setTaskTab] = useState("待办")
   return <main className="dashboard-grid grid gap-5 p-4 xl:p-5"><section className="space-y-5"><Panel title="工作数字化"><div className="grid gap-3 p-3 md:grid-cols-2">
-    <Card title="模型操作"><div className="grid grid-cols-3 gap-2">{[["新建", "新建模型", "plus", "models"], ["待办", `${todos.length}项待办`, "clock", "todo"], ["已办", "模型簇进度", "check", "done"]].map(([title, sub, icon, target]) => <button key={title} onClick={() => navigate(target as View)} className="action-tile"><span className="action-icon"><Icon name={icon as IconName} size={17}/></span><b>{title}</b><small>{sub}</small></button>)}</div></Card>
+    <Card title="模型操作"><div className="grid grid-cols-3 gap-2">{[["新建", "新建模型", "plus", "models"], ["待办", `${todos.length}项待办`, "clock", "todo"], ["已办", "模型簇记录", "check", "done"]].map(([title, sub, icon, target]) => <button key={title} onClick={() => navigate(target as View)} className="action-tile"><span className="action-icon"><Icon name={icon as IconName} size={17}/></span><b>{title}</b><small>{sub}</small></button>)}</div></Card>
     <button onClick={() => navigate("construction")} className="card text-left hover-card"><h3 className="card-title">模型建设</h3><div className="mt-5 flex items-center justify-between text-sm font-medium">{["建议", "设计", "测试", "配置"].map((x, i) => <span className="contents" key={x}><span>{x}</span>{i < 3 && <Icon name="arrow" size={14}/>}</span>)}</div><p className="mt-5 text-center text-xs text-[#58709e]">请休假模型 · 四阶段建设闭环</p></button>
     <DigitalLibraryMini onOpen={() => navigate("query")} />
     <Card title="自定义展示"><div className="grid grid-cols-2 gap-2">{["我的模型", "最近使用", "最近查询", "继续查看", "收藏要素", "快捷进入"].map(x => <button onClick={() => openFeature(x)} key={x} className="quick-row">{x}<Icon name="chevron" size={13}/></button>)}</div></Card>
@@ -246,7 +272,7 @@ function RuntimeModelField({ field, value, onChange, style, optionsOverride }: {
   return <label className="runtime-model-field" style={style}>{common}<input disabled={disabled} type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"} value={String(value ?? "")} min={field.type === "number" && field.min !== undefined ? field.min : undefined} max={field.type === "number" && field.max !== undefined ? field.max : undefined} minLength={field.minLength} maxLength={field.maxLength} pattern={field.pattern} onChange={event => onChange(event.target.value)} placeholder={field.placeholder || (field.type === "user" ? "请选择人员" : field.type === "department" ? "请选择部门" : "请输入" + field.label)}/></label>
 }
 
-function ModelDetail({ model, requester, onStart }: { model: Model; requester: string; onStart: (request?: LeaveRequest, run?: { modelName: string; values: Record<string, unknown> }) => Promise<void> | void }) {
+function ModelDetail({ model, requester, requesterDepartment, onStart }: { model: Model; requester: string; requesterDepartment: string; onStart: (request?: LeaveRequest, run?: { modelName: string; values: Record<string, unknown> }) => Promise<void> | void }) {
   const fallback = modelDefinitions[model[0]] ?? modelDefinitions[leaveModel[0]]
   const [runtimeProject, setRuntimeProject] = useState<any>(null)
   const [loadingDefinition, setLoadingDefinition] = useState(true)
@@ -262,10 +288,11 @@ function ModelDetail({ model, requester, onStart }: { model: Model; requester: s
       for (const field of (project.design?.fields ?? [])) {
         if (field.defaultValue !== undefined) defaults[field.key] = field.defaultValue
         if (field.source === "当前用户" || field.sourceMode === "current_user") defaults[field.key] = requester
+        if (field.key === "department" && requesterDepartment && (field.type === "department" || field.sourceMode === "library_fill")) defaults[field.key] = requesterDepartment
       }
       setValues(defaults)
     }).catch(() => undefined).finally(() => setLoadingDefinition(false))
-  }, [model[0], requester])
+  }, [model[0], requester, requesterDepartment])
   const fields: ModelField[] = runtimeProject?.design?.fields ?? fallback.fields
   const config = runtimeProject?.configuration ?? {}
   const design = runtimeProject?.design ?? {}
@@ -321,18 +348,27 @@ function ModelDetail({ model, requester, onStart }: { model: Model; requester: s
 }
 function TodoTable({ items, openTodo }: { items: typeof initialTodos; openTodo: (x: typeof initialTodos[number]) => void }) { return <div className="table-wrap"><div className="data-table todo-cols table-head"><span>事项名称</span><span>所属模型</span><span>发起人</span><span>到达时间</span><span>状态</span><span>操作</span></div>{items.map(item => { const smart = parseSmartTodoContent(item); return <button key={item.id} onClick={() => openTodo(item)} className="data-table todo-cols table-row"><span>{item.title}</span><span>{item.model}</span><span>{item.sender}</span><span>{item.date}</span><span><em className="status warning">{item.status}</em></span><span className="link">{smart ? "查看" : "办理"}</span></button> })}{items.length === 0 && <Empty text="当前没有待办事项"/>}</div> }
 
-type ApprovalTodoView = { sourceModelName: string; currentStep: string; currentStepIndex: number; currentRole: string; route: string[]; businessData: Record<string, unknown> }
+type BusinessFieldView = { key:string; label:string; digitalId?:string; type?:string; order?:number }
+type ApprovalTodoView = { sourceModelName: string; sourceFileName:string; currentStep: string; currentStepIndex: number; currentRole: string; currentRequirement:string; currentReminderRule:string; currentOutputField:string; approvalNodeEvidence:Record<string,unknown>; approvalComputationEvidence:Record<string,unknown>; approverCalculation:Record<string,unknown>[]; pathCalculation:Record<string,unknown>; route: string[]; businessFields:BusinessFieldView[]; businessData: Record<string, unknown>; approvalTotalSteps:number; approvalArrivedAt:string; approvalDueAt:string; approvalTimeoutHours:number; currentTimeoutValue:string; thresholdVariables:Record<string,unknown>[]; allowedActions:string[] }
 type SmartTodoView = { sourceModelName: string; businessSourceModelName: string; businessFileName: string; businessDisplayFileName: string; businessDigitalId: string; associatedDigitalIds: string[]; approvalResult: string; smartDecision: string; triggeredModels: string[]; triggerError: string; businessData: Record<string, unknown> }
-const businessFieldLabels: Record<string, string> = { applicant: "申请人", department: "所属部门", leaveType: "请假类型", startDate: "开始日期", endDate: "结束日期", days: "请假天数", reason: "请假事由", approvalContent: "申请内容", title: "事项名称", amount: "金额", meetingType: "会议类型", topicName: "议题名称" }
+const businessFieldLabels: Record<string, string> = { applicant: "申请人", department: "所属部门", leaveType: "请假类型", startDate: "开始日期", endDate: "结束日期", days: "请假天数", reason: "请假事由", approvalContent: "申请内容", title: "事项名称", amount: "金额", meetingType: "会议类型", topicName: "议题名称", approvalTotalSteps:"审批总环节", approvalCurrentStep:"当前审批环节", approvalCurrentApprover:"当前审批人", approvalOpinion:"审批意见", approvalTime:"审批时间", approvalResultPdf:"审批结果文档引用", approvalAdministrativeLevel:"行政审批最终层级", approvalTechnicalLevel:"技术审查最终层级", approvalTimeoutHours:"审批时限", approvalModelDesignSource:"审批设计来源" }
 const preferredBusinessKeys = ["applicant", "department", "leaveType", "startDate", "endDate", "days", "reason", "approvalContent"]
 function parseApprovalTodoContent(item: typeof initialTodos[number]): ApprovalTodoView | null {
   const raw = "content" in item ? String(item.content ?? "").trim() : ""
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
-    if (parsed.type === "approval_task_v2") return {
-      sourceModelName: String(parsed.sourceModelName ?? "业务事项"), currentStep: String(parsed.currentStep ?? "审批"), currentStepIndex: Number(parsed.currentStepIndex ?? 0), currentRole: String(parsed.currentRole ?? ""),
-      route: Array.isArray(parsed.route) ? parsed.route.map(String) : [], businessData: parsed.businessData && typeof parsed.businessData === "object" && !Array.isArray(parsed.businessData) ? parsed.businessData as Record<string, unknown> : {},
+    if (parsed.type === "approval_task_v2" || parsed.type === "approval_task_v3") return {
+      sourceModelName: String(parsed.sourceModelName ?? "业务事项"), sourceFileName:String(parsed.sourceFileName ?? ""), currentStep: String(parsed.currentStep ?? "审批"), currentStepIndex: Number(parsed.currentStepIndex ?? 0), currentRole: String(parsed.currentRole ?? ""),
+      currentRequirement:String(parsed.currentRequirement ?? ""), currentReminderRule:String(parsed.currentReminderRule ?? ""), currentOutputField:String(parsed.currentOutputField ?? ""),
+      approvalNodeEvidence:parsed.approvalNodeEvidence && typeof parsed.approvalNodeEvidence === "object" && !Array.isArray(parsed.approvalNodeEvidence) ? parsed.approvalNodeEvidence as Record<string,unknown> : {},
+      approvalComputationEvidence:parsed.approvalComputationEvidence && typeof parsed.approvalComputationEvidence === "object" && !Array.isArray(parsed.approvalComputationEvidence) ? parsed.approvalComputationEvidence as Record<string,unknown> : {},
+      approverCalculation:Array.isArray(parsed["审批人计算"]) ? parsed["审批人计算"].filter((value):value is Record<string,unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value)) : [],
+      pathCalculation:parsed["审批路径计算"] && typeof parsed["审批路径计算"] === "object" && !Array.isArray(parsed["审批路径计算"]) ? parsed["审批路径计算"] as Record<string,unknown> : {},
+      route: Array.isArray(parsed.route) ? parsed.route.map(String) : [],
+      businessFields:Array.isArray(parsed.businessFields) ? parsed.businessFields.filter((value):value is Record<string,unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value)).map((field,index)=>({key:String(field.key ?? ""),label:String(field.label ?? field.key ?? "字段"),digitalId:String(field.digitalId ?? "") || undefined,type:String(field.type ?? "") || undefined,order:Number(field.order ?? index)})).filter(field=>field.key) : [],
+      businessData: parsed.businessData && typeof parsed.businessData === "object" && !Array.isArray(parsed.businessData) ? parsed.businessData as Record<string, unknown> : {},
+      approvalTotalSteps:Number(parsed.approvalTotalSteps ?? (Array.isArray(parsed.route) ? parsed.route.length : 0)), approvalArrivedAt:String(parsed.approvalArrivedAt ?? ""), approvalDueAt:String(parsed.approvalDueAt ?? ""), approvalTimeoutHours:Number(parsed.approvalTimeoutHours ?? 0), currentTimeoutValue:String(parsed.currentTimeoutValue ?? ""), thresholdVariables:Array.isArray(parsed.thresholdVariables) ? parsed.thresholdVariables.filter((value): value is Record<string,unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value)) : [], allowedActions:Array.isArray(parsed.allowedActions) ? parsed.allowedActions.map(String).filter(Boolean) : ["同意","不同意","退回修改"],
     }
   } catch { /* 兼容升级前生成的待办内容 */ }
   const findLine = (label: string) => raw.split(/\r?\n/).find(line => line.startsWith(`${label}：`))?.slice(label.length + 1).trim() ?? ""
@@ -342,15 +378,16 @@ function parseApprovalTodoContent(item: typeof initialTodos[number]): ApprovalTo
   try { const parsed = JSON.parse(businessLine); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) businessData = parsed as Record<string, unknown> } catch { /* ignore */ }
   const route = findLine("审批路线").split(/\s*→\s*/).filter(Boolean)
   const currentStep = findLine("当前审批环节") || route[0] || "审批"
-  return { sourceModelName: findLine("前序模型") || "业务事项", currentStep, currentStepIndex: Math.max(0, route.indexOf(currentStep)), currentRole: "", route, businessData }
+  return { sourceModelName: findLine("前序模型") || "业务事项",sourceFileName:"", currentStep, currentStepIndex: Math.max(0, route.indexOf(currentStep)), currentRole: "",currentRequirement:"",currentReminderRule:"",currentOutputField:"",approvalNodeEvidence:{},approvalComputationEvidence:{},approverCalculation:[],pathCalculation:{}, route, businessFields:[],businessData, approvalTotalSteps:route.length, approvalArrivedAt:"", approvalDueAt:"", approvalTimeoutHours:0, currentTimeoutValue:"", thresholdVariables:[], allowedActions:["同意","不同意","退回修改"] }
 }
+
 function parseSmartTodoContent(item: typeof initialTodos[number]): SmartTodoView | null {
   const raw = "content" in item ? String(item.content ?? "").trim() : ""
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
     if (!(["smart_result_v1", "smart_result_v2", "smart_result_v3"] as unknown[]).includes(parsed.type)) return null
-    const associatedDigitalIds = Array.isArray(parsed.associatedDigitalIds) ? parsed.associatedDigitalIds.map(String).filter(value => /^\d{16}$/.test(value)) : []
+    const associatedDigitalIds = Array.isArray(parsed.associatedDigitalIds) ? parsed.associatedDigitalIds.map(String).filter(value => /^(?:5013\d{15}|\d{16})$/.test(value)) : []
     const businessSourceModelName = String(parsed.businessSourceModelName ?? "业务事项")
     return {
       sourceModelName: String(parsed.sourceModelName ?? "审批模型"),
@@ -375,11 +412,32 @@ function businessValue(key: string, value: unknown) {
   if (typeof value === "object") return JSON.stringify(value)
   return String(value)
 }
-function businessEntries(data: Record<string, unknown>) {
-  const hidden = new Set(["sourceModelName", "sourceFileName", "sourceDisplayFileName", "sourceDigitalId", "sourceRunId", "sourceInput", "sourceOutput", "businessSourceModelName", "businessFileName", "businessDisplayFileName", "businessDigitalId", "associatedDigitalIds", "approvalRoute", "approvalStatus", "approvalResult", "approvalProcess"])
-  const keys = [...preferredBusinessKeys.filter(key => key in data), ...Object.keys(data).filter(key => !preferredBusinessKeys.includes(key) && !hidden.has(key))]
-  return keys.filter((key, index) => keys.indexOf(key) === index && data[key] !== undefined && data[key] !== null && data[key] !== "").map(key => ({ key, label: businessFieldLabels[key] ?? key, value: businessValue(key, data[key]) }))
+const approvalEvidenceLabels:Record<string,string> = {
+  organizationName:"审批组织", organizationRank:"审批层级岗位", baseTarget:"基础审批目标", adjustedTarget:"最终审批目标",
+  organizationRule:"组织路径规则", rule:"匹配规则", nodeConfig:"节点配置依据", nodeType:"节点类型", rank:"审批层级岗位",
+  sourceModel:"来源业务模型", sourceModelCode:"来源业务模型数字化编码", baseAdministrativeTarget:"基础审批目标",
+  adjustedAdministrativeTarget:"最终审批目标层级", baseTechnicalTarget:"基础技术业务审查目标层级", adjustedTechnicalTarget:"最终技术业务审查目标层级",
+  matchedThresholds:"命中数字化标识阈值", applicant:"申请人", startDepartment:"申请人所在部门", organizationPath:"组织逐级路径",
+  nodeRule:"节点计算规则", requirement:"审批要求", timeoutHours:"规定时限", reminderRule:"提醒规则", outputField:"输出要求",
 }
+function evidenceValueText(value:unknown):string {
+  if (value === undefined || value === null || value === "") return "—"
+  if (Array.isArray(value)) return value.map(item => typeof item === "object" && item !== null ? evidenceText(item as Record<string,unknown>) : String(item)).filter(Boolean).join("、")
+  if (typeof value === "object") return evidenceText(value as Record<string,unknown>)
+  return String(value)
+}
+function evidenceText(value: Record<string,unknown>) {
+  return Object.entries(value).filter(([key,item]) => item !== undefined && item !== null && item !== "" && (approvalEvidenceLabels[key] || /[\u3400-\u9fff]/.test(key))).map(([key,item]) => `${approvalEvidenceLabels[key] ?? key}：${evidenceValueText(item)}`).join("；")
+}
+function businessEntries(data: Record<string, unknown>, fields: BusinessFieldView[] = []) {
+  const hidden = new Set(["sourceModelName", "sourceFileName", "sourceDisplayFileName", "sourceDigitalId", "sourceRunId", "sourceInput", "sourceOutput", "businessSourceModelName", "businessFileName", "businessDisplayFileName", "businessDigitalId", "associatedDigitalIds", "approvalRoute", "approvalStatus", "approvalResult", "approvalProcess", "approvalBusinessContent", "approvalComputationEvidence"])
+  const configured=fields.filter(field=>field.key && field.key in data).sort((a,b)=>Number(a.order ?? 0)-Number(b.order ?? 0))
+  const configuredKeys=new Set(configured.map(field=>field.key))
+  const result=configured.filter(field=>data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").map(field=>({key:field.key,label:field.label || businessFieldLabels[field.key] || field.key,value:businessValue(field.key,data[field.key])}))
+  const keys = [...preferredBusinessKeys.filter(key => key in data && !configuredKeys.has(key)), ...Object.keys(data).filter(key => !preferredBusinessKeys.includes(key) && !configuredKeys.has(key) && !hidden.has(key))]
+  return [...result,...keys.filter((key, index) => keys.indexOf(key) === index && data[key] !== undefined && data[key] !== null && data[key] !== "").map(key => ({ key, label: businessFieldLabels[key] ?? key, value: businessValue(key, data[key]) }))]
+}
+
 function TodoDetail({ item, onFinish, onSave }: { item: typeof initialTodos[number]; onFinish: (r: string) => void; onSave: () => void }) {
   const smart = parseSmartTodoContent(item)
   if (smart) {
@@ -395,111 +453,130 @@ function TodoDetail({ item, onFinish, onSave }: { item: typeof initialTodos[numb
       <aside className="summary approval-summary"><h4>模型运行进度</h4><div className="approval-source"><span>业务来源</span><b>{smart.businessSourceModelName}</b></div><div className="approval-progress"><div className="done"><i>✓</i><span><b>{smart.sourceModelName}</b><small>已归档</small></span></div><div className="done"><i>✓</i><span><b>智选模型</b><small>已完成标识关联判断</small></span></div>{smart.triggeredModels.length ? smart.triggeredModels.map((name, index) => <div className="current" key={`${name}-${index}`}><i>{index + 3}</i><span><b>{name}</b><small>已触发</small></span></div>) : <div className="pending"><i>3</i><span><b>后续关联模型</b><small>未配置关联模型</small></span></div>}</div></aside></div>
   }
   const approval = parseApprovalTodoContent(item)
-  const entries = approval ? businessEntries(approval.businessData) : []
+  const entries = approval ? businessEntries(approval.businessData, approval.businessFields) : []
   const applicant = approval ? String(approval.businessData.applicant ?? item.sender) : item.sender
   const department = approval ? String(approval.businessData.department ?? "—") : "—"
   return <div className="detail-grid"><div><div className="flex flex-wrap items-center gap-3"><h3 className="detail-title !mt-0">{item.title}</h3><span className="status warning">{item.status}</span></div>
     <div className="meta-grid todo-meta-grid"><span>发起人<b>{applicant}</b></span><span>所属部门<b>{department}</b></span><span>当前环节<b>{approval?.currentStep ?? item.model}</b></span><span>到达时间<b>{item.date}</b></span></div>
     <h4 className="section-title">业务内容</h4>
     {approval ? <div className="business-detail-grid">{entries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{entries.length === 0 && <div className="business-empty">暂无可展示的业务字段</div>}</div> : <div className="content-box whitespace-pre-line">{("content" in item ? String(item.content ?? "") : "") || "请核对本事项相关内容及附件，根据实际情况填写办理意见，并选择相应处理结果。"}</div>}
-    <h4 className="section-title">办理意见</h4><textarea className="input w-full" rows={5} placeholder="请输入办理意见"/><div className="mt-5 flex flex-wrap justify-end gap-3"><button onClick={onSave} className="btn-secondary">保存</button><button onClick={() => onFinish("退回修改")} className="btn-secondary text-[#b55a37]">退回</button><button onClick={() => onFinish("不同意")} className="btn-secondary text-[#bb4545]">不同意</button><button onClick={() => onFinish("同意")} className="btn-primary">同意</button></div></div>
-    <aside className="summary approval-summary"><h4>审批进度</h4>{approval ? <><div className="approval-source"><span>业务来源</span><b>{approval.sourceModelName}</b></div><div className="approval-progress">{(approval.route.length ? approval.route : [approval.currentStep]).map((step, index) => <div key={`${step}-${index}`} className={index < approval.currentStepIndex ? "done" : index === approval.currentStepIndex ? "current" : "pending"}><i>{index < approval.currentStepIndex ? "✓" : index + 1}</i><span><b>{step}</b><small>{index < approval.currentStepIndex ? "已完成" : index === approval.currentStepIndex ? `${approval.currentRole ? `${approval.currentRole} · ` : ""}待办理` : "待流转"}</small></span></div>)}</div></> : <div className="timeline"><p><b>事项发起</b><span>{item.sender}</span></p><p><b>当前状态</b><span>{item.status} · {item.date}</span></p></div>}</aside></div>
+    {approval && <><h4 className="section-title">本环节办理信息</h4><div className="business-detail-grid"><div><span>规定时限</span><b>{approvalTimeoutDisplay(approval.currentTimeoutValue)}</b></div><div><span>提醒规则</span><b>{approval.currentReminderRule || "未配置"}</b></div><div><span>输出要求</span><b>{approval.currentOutputField || "审批/审查意见"}</b></div></div><h4 className="section-title">审批路径计算</h4><div className="business-detail-grid"><div className="wide"><span>正式审批路径</span><b>{approval.route.length ? approval.route.join(" → ") : approval.currentStep}</b></div><div><span>基础审批目标</span><b>{String(approval.pathCalculation["基础审批目标"] ?? approval.pathCalculation["基础审批目标层级"] ?? approval.approvalComputationEvidence.baseAdministrativeTarget ?? "—")}</b></div><div><span>最终审批目标</span><b>{String(approval.pathCalculation["最终审批目标"] ?? approval.pathCalculation["最终审批目标层级"] ?? approval.approvalComputationEvidence.adjustedAdministrativeTarget ?? "—")}</b></div>{approval.thresholdVariables.length > 0 && <div className="wide"><span>命中数字化标识阈值</span><b>{approval.thresholdVariables.map(value => `${String(value.thresholdType ?? "阈值")}：${String(value.actualValue ?? "—")} ≥ ${String(value.thresholdValue ?? "—")} → ${String(value.approvalLevel ?? "")}`).join("；")}</b></div>}</div><h4 className="section-title">审批人计算</h4><div className="business-detail-grid"><div><span>当前审批人</span><b>{String(approval.approverCalculation[approval.currentStepIndex]?.["审批人"] ?? approval.currentRole ?? "待匹配")}</b></div><div><span>审批组织</span><b>{String(approval.approverCalculation[approval.currentStepIndex]?.["审批组织"] ?? "按组织关系计算")}</b></div><div><span>审批层级/岗位</span><b>{String(approval.approverCalculation[approval.currentStepIndex]?.["审批层级岗位"] ?? approval.currentRole ?? "未配置")}</b></div></div></>}
+    <h4 className="section-title">办理意见</h4><textarea className="input w-full" rows={5} placeholder="请输入办理意见"/><div className="mt-5 flex flex-wrap justify-end gap-3"><button onClick={onSave} className="btn-secondary">保存</button>{(approval?.allowedActions.length ? approval.allowedActions : ["同意","不同意","退回修改"]).map(action => <button key={action} onClick={() => onFinish(action)} className={action === "同意" ? "btn-primary" : action === "不同意" ? "btn-secondary text-[#bb4545]" : "btn-secondary text-[#b55a37]"}>{action}</button>)}</div></div>
+    <aside className="summary approval-summary"><h4>审批路径</h4>{approval ? <><div className="approval-source"><span>业务来源</span><b>{approval.sourceModelName}</b></div><div className="approval-progress">{(approval.route.length ? approval.route : [approval.currentStep]).map((step, index) => <div key={`${step}-${index}`} className={index < approval.currentStepIndex ? "done" : index === approval.currentStepIndex ? "current" : "pending"}><i>{index < approval.currentStepIndex ? "✓" : index + 1}</i><span><b>{step}</b><small>{index < approval.currentStepIndex ? "已完成" : index === approval.currentStepIndex ? `${approval.currentRole ? `${approval.currentRole} · ` : ""}待办理` : "待流转"}</small></span></div>)}</div>{approval.approvalDueAt && <div className="approval-source"><span>当前环节到期</span><b>{approval.approvalDueAt.slice(0,19).replace("T"," ")}</b></div>}</> : <div className="timeline"><p><b>事项发起</b><span>{item.sender}</span></p><p><b>当前状态</b><span>{item.status} · {item.date}</span></p></div>}</aside></div>
 }
-function parseModelClusterContent(item: DoneRecord): ModelClusterContent | null {
+type BusinessActivityContent = { rootRunId:string; fileName:string; displayFileName:string; digitalId:string; businessStatus:string; phase:string; input:Record<string,unknown>; output:Record<string,unknown>; approval:Record<string,unknown>|null; smart:Record<string,unknown>|null }
+function parseBusinessActivityContent(item: DoneRecord): BusinessActivityContent | null {
   if (item.record_kind !== "cluster") return null
   try {
-    const parsed = JSON.parse(String(item.content ?? "")) as Record<string, unknown>
-    if (parsed.type !== "model_cluster") return null
-    const asRecord = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
-    const parseProgress = (value: unknown): ModelClusterApprovalStep[] => Array.isArray(value) ? value.map(raw => {
-      const step = asRecord(raw)
-      return {
-        stepIndex: Number(step.stepIndex ?? 0),
-        step: String(step.step ?? "审批步骤"),
-        approver: String(step.approver ?? ""),
-        status: String(step.status ?? ""),
-        result: String(step.result ?? ""),
-        handledAt: String(step.handledAt ?? ""),
-      }
-    }) : []
-    const approvalRaw = parsed.approval && typeof parsed.approval === "object" && !Array.isArray(parsed.approval) ? parsed.approval as Record<string, unknown> : null
-    const smartRaw = parsed.smart && typeof parsed.smart === "object" && !Array.isArray(parsed.smart) ? parsed.smart as Record<string, unknown> : null
+    const parsed=JSON.parse(String(item.content ?? "{}")) as Record<string,unknown>
+    if (parsed.type !== "business_model_activity_v2") return null
+    const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
     return {
-      rootRunId: String(parsed.rootRunId ?? ""),
-      fileName: String(parsed.fileName ?? ""),
-      displayFileName: String(parsed.displayFileName ?? ""),
-      digitalId: String(parsed.digitalId ?? ""),
-      businessStatus: String(parsed.businessStatus ?? "已归档"),
-      input: asRecord(parsed.input),
-      output: asRecord(parsed.output),
-      approval: approvalRaw ? {
-        runId: String(approvalRaw.runId ?? ""),
-        fileName: String(approvalRaw.fileName ?? ""),
-        displayFileName: String(approvalRaw.displayFileName ?? ""),
-        status: String(approvalRaw.status ?? ""),
-        result: String(approvalRaw.result ?? ""),
-        output: asRecord(approvalRaw.output),
-        progress: parseProgress(approvalRaw.progress),
-      } : null,
-      smart: smartRaw ? {
-        runId: String(smartRaw.runId ?? ""),
-        fileName: String(smartRaw.fileName ?? ""),
-        displayFileName: String(smartRaw.displayFileName ?? ""),
-        status: String(smartRaw.status ?? ""),
-        result: String(smartRaw.result ?? ""),
-        output: asRecord(smartRaw.output),
-      } : null,
+      rootRunId:String(parsed.rootRunId ?? ""),fileName:String(parsed.fileName ?? ""),displayFileName:String(parsed.displayFileName ?? ""),digitalId:String(parsed.digitalId ?? ""),businessStatus:String(parsed.businessStatus ?? item.status),phase:String(parsed.phase ?? item.result ?? "申请阶段"),
+      input:object(parsed.input),output:object(parsed.output),approval:parsed.approval && typeof parsed.approval === "object" && !Array.isArray(parsed.approval) ? parsed.approval as Record<string,unknown> : null,smart:parsed.smart && typeof parsed.smart === "object" && !Array.isArray(parsed.smart) ? parsed.smart as Record<string,unknown> : null,
     }
   } catch { return null }
 }
-function clusterStage(cluster: ModelClusterContent) { return cluster.approval?.status === "已归档" ? "有效阶段" : "申请阶段" }
-function clusterApprovalTimeline(approval: ModelClusterApproval | null) {
-  if (!approval) return [] as ModelClusterApprovalStep[]
-  const configured: unknown[] = Array.isArray(approval.output.approvalResolvedSteps) ? approval.output.approvalResolvedSteps : []
-  if (!configured.length) return approval.progress
-  return configured.map((raw, index) => {
-    const item = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
-    const title = String(item.title ?? `审批步骤${index + 1}`)
-    const history = approval.progress.find(step => step.stepIndex === index + 1) ?? approval.progress.find(step => step.step === title)
-    return history ?? { stepIndex:index + 1, step:title, approver:"", status:"待流转", result:"", handledAt:"" }
-  })
+function phaseClass(phase:string) { return phase === "有效阶段" ? "success" : phase.includes("终止") || phase.includes("未生效") ? "danger" : "warning" }
+function relatedModelStatus(value: unknown) {
+  const raw=String(value ?? "").trim()
+  if (["已归档","已完成","已办结"].includes(raw)) return "已完成"
+  if (["待处理","待办理","运行中","审批中","处理中","已启动"].includes(raw)) return "运行中"
+  if (["启动中","待启动"].includes(raw)) return "启动中"
+  return raw || "已启动"
 }
-function DoneTable({ items, onOpen }: { items: DoneRecord[]; onOpen: (x: DoneRecord) => void }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  return <div className="done-cluster-list">
-    <div className="data-table done-cluster-cols table-head"><span>文件名</span><span>所属模型</span><span>当前阶段</span><span>模型簇进度</span><span>操作</span></div>
-    {items.map(item => {
-      const cluster = parseModelClusterContent(item)
-      if (!cluster) return <div key={item.id} className="data-table done-cluster-cols table-row"><span>{item.title}</span><span>{item.model}</span><span><em className="status success">{item.result}</em></span><span className="muted">独立已办记录</span><span><button onClick={() => onOpen(item)} className="link">查看</button></span></div>
-      const opened = Boolean(expanded[item.id])
-      const stage = clusterStage(cluster)
-      const approvalState = !cluster.approval ? "待启动" : cluster.approval.status === "已归档" ? "已完成" : cluster.approval.status || "审批中"
-      const smartState = !cluster.smart ? "未启动" : cluster.smart.status === "已归档" ? "已完成" : cluster.smart.status || "运行中"
-      const timeline = clusterApprovalTimeline(cluster.approval)
-      const firstPending = timeline.findIndex(step => !(step.result || step.handledAt || ["已完成","已退回"].includes(step.status)))
-      return <div key={item.id} className={`done-cluster-item ${opened ? "expanded" : ""}`}>
-        <div className="data-table done-cluster-cols table-row">
-          <span className="cluster-file-cell"><button type="button" className={`cluster-expand-toggle ${opened ? "open" : ""}`} onClick={() => setExpanded(current => ({ ...current, [item.id]: !opened }))} aria-label={opened ? "收起模型簇" : "展开模型簇"}><Icon name="chevron" size={13}/></button><span><b className="font-mono">{cluster.fileName || item.title}</b>{cluster.displayFileName && cluster.displayFileName !== cluster.fileName && <small>{cluster.displayFileName}</small>}</span></span>
-          <span>{item.model}</span>
-          <span><em className={`status ${stage === "有效阶段" ? "success" : "warning"}`}>{stage}</em></span>
-          <span className="cluster-compact-progress"><em className="done">业务 ✓</em><i>→</i><em className={cluster.approval?.status === "已归档" ? "done" : cluster.approval ? "current" : "pending"}>审批 {approvalState}</em><i>→</i><em className={cluster.smart?.status === "已归档" ? "done" : cluster.smart ? "current" : "pending"}>智选 {smartState}</em></span>
-          <span><button onClick={() => onOpen(item)} className="link">查看</button></span>
-        </div>
-        {opened && <div className="model-cluster-expand">
-          <div className="model-cluster-node-grid">
-            <div className="model-cluster-node done"><span>1</span><div><b>{item.model}</b><small>业务模型已入库 · 进入申请阶段</small><em className="font-mono">{cluster.fileName || "—"}</em></div><strong>已完成</strong></div>
-            <div className={`model-cluster-node ${cluster.approval?.status === "已归档" ? "done" : cluster.approval ? "current" : "pending"}`}><span>2</span><div><b>审批模型</b><small>{cluster.approval ? (cluster.approval.status === "已归档" ? "审批模型已完成 · 进入有效阶段" : "审批模型运行中") : "等待业务入库后触发"}</small><em className="font-mono">{cluster.approval?.fileName || "—"}</em></div><strong>{approvalState}</strong></div>
-            <div className={`model-cluster-node ${cluster.smart?.status === "已归档" ? "done" : cluster.smart ? "current" : "pending"}`}><span>3</span><div><b>智选模型</b><small>{cluster.smart ? (cluster.smart.status === "已归档" ? "智选判断已完成" : "智选模型运行中") : "等待审批模型完成后触发"}</small><em className="font-mono">{cluster.smart?.fileName || "—"}</em></div><strong>{smartState}</strong></div>
-          </div>
-          <div className="cluster-approval-progress-panel"><div className="cluster-progress-head"><div><b>审批模型进度</b><small>{cluster.approval ? cluster.approval.result || cluster.approval.status : "审批模型尚未启动"}</small></div>{cluster.approval && <span>{timeline.length} 个审批环节</span>}</div>
-            {!cluster.approval ? <div className="cluster-progress-empty">业务模型已完成入库，当前处于申请阶段，等待审批模型启动。</div> : timeline.length ? <div className="approval-progress">{timeline.map((step, index) => { const finished = Boolean(step.result || step.handledAt || ["已完成","已退回"].includes(step.status)) || cluster.approval?.status === "已归档"; const current = !finished && (firstPending < 0 ? index === timeline.length - 1 : index === firstPending); return <div key={`${step.step}-${index}`} className={finished ? "done" : current ? "current" : "pending"}><i>{finished ? "✓" : index + 1}</i><span><b>{step.step}</b><small>{[step.approver, step.result || step.status || (current ? "待办理" : "待流转"), step.handledAt].filter(Boolean).join(" · ")}</small></span></div>})}</div> : <div className="cluster-progress-empty">审批模型已启动，暂未生成可展示的审批环节。</div>}
-          </div>
-        </div>}
-      </div>
-    })}
-    {items.length === 0 && <Empty text="当前没有已办记录"/>}
-  </div>
+function relatedModelStatusClass(value: unknown) { return relatedModelStatus(value) === "已完成" ? "success" : "warning" }
+function approvalTimeoutDisplay(value: unknown) {
+  const raw=String(value ?? "").trim()
+  if (!raw || raw === "0" || raw === "未配置" || /按.*配置|来自.*数字化库/.test(raw)) return "未配置"
+  const cleaned=raw.replace(/（源资料未定义单位）/g, "").replace(/\s*(小时|工作日|天)$/g, "").trim()
+  if (/[、,，;；]/.test(cleaned)) return "未配置"
+  return /^\d+(?:\.\d+)?$/.test(cleaned) ? cleaned : "未配置"
 }
+function approvalElapsedDisplay(arrivedAt: unknown, handledAt: unknown) {
+  const arrived=new Date(String(arrivedAt ?? ""))
+  const handled=new Date(String(handledAt ?? ""))
+  const arrivedMs=arrived.getTime()
+  const handledMs=handled.getTime()
+  if (!Number.isFinite(arrivedMs) || !Number.isFinite(handledMs) || handledMs < arrivedMs) return "—"
+  let seconds=Math.floor((handledMs-arrivedMs)/1000)
+  const days=Math.floor(seconds/86400); seconds%=86400
+  const hours=Math.floor(seconds/3600); seconds%=3600
+  const minutes=Math.floor(seconds/60); seconds%=60
+  const parts:string[]=[]
+  if (days) parts.push(`${days}天`)
+  if (hours || days) parts.push(`${hours}小时`)
+  if (minutes || hours || days) parts.push(`${minutes}分`)
+  parts.push(`${seconds}秒`)
+  return parts.join("")
+}
+function HandledTable({ items, onOpen }: { items: DoneRecord[]; onOpen: (x: DoneRecord) => void }) {
+  const [expanded,setExpanded]=useState<Record<string,boolean>>({})
+  return <div className="done-cluster-list"><div className="data-table handled-stage-cols table-head"><span>事项/文件名</span><span>所属模型</span><span>当前阶段</span><span>办理/发起时间</span><span>结果</span><span>操作</span></div>{items.map(item=>{
+    const activity=parseBusinessActivityContent(item)
+    if (!activity) return <button key={item.id} onClick={()=>onOpen(item)} className="data-table handled-stage-cols table-row"><span>{item.title}</span><span>{item.model}</span><span><em className="status">办理记录</em></span><span>{item.handled || item.date}</span><span><em className={`status ${item.result === "不同意" || item.result === "退回修改" ? "danger" : "success"}`}>{item.result}</em></span><span className="link">{item.record_kind === "approval_run" ? "查看审批模型" : "查看办理记录"}</span></button>
+    const opened=Boolean(expanded[item.id])
+    return <div key={item.id} className={`done-cluster-item ${opened ? "expanded" : ""}`}><div className="data-table handled-stage-cols table-row"><span className="cluster-file-cell"><button type="button" className={`cluster-expand-toggle ${opened ? "open" : ""}`} onClick={()=>setExpanded(current=>({...current,[item.id]:!opened}))} aria-label={opened ? "收起关联模型" : "展开关联模型"}><Icon name="chevron" size={13}/></button><span><b className="font-mono">{activity.fileName || item.title}</b>{activity.displayFileName && activity.displayFileName !== activity.fileName && <small>{activity.displayFileName}</small>}</span></span><span>{item.model}</span><span><em className={`status ${phaseClass(activity.phase)}`}>{activity.phase}</em></span><span>{item.handled || item.date}</span><span><em className="status success">业务模型已办结</em></span><span><button onClick={()=>onOpen(item)} className="link">查看业务模型</button></span></div>{opened && <div className="model-cluster-expand"><div className="cluster-model-list-head"><b>关联模型</b><small>点击模型直接查看该次模型本身</small></div><div className="cluster-model-list">{activity.approval ? <button className="cluster-model-entry" onClick={()=>onOpen(completedRelatedRecord(item,activity.approval!,"approval"))}><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small className="font-mono">{String(activity.approval.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(activity.approval.status)}`}>{relatedModelStatus(activity.approval.status)}</span><span className="cluster-model-open">查看审批模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small>业务模型数字化库触发后生成审批模型文件</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}{activity.smart ? <button className="cluster-model-entry" onClick={()=>onOpen(completedRelatedRecord(item,activity.smart!,"smart"))}><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small className="font-mono">{String(activity.smart.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(activity.smart.status)}`}>{relatedModelStatus(activity.smart.status)}</span><span className="cluster-model-open">查看智选模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small>审批模型归档后由数字化库触发</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}</div></div>}</div>
+  })}{items.length === 0 && <Empty text="当前没有已办记录"/>}</div>
+}
+function HandledDetail({ item, onOpenModel }: { item?: DoneRecord; onOpenModel:(x:DoneRecord)=>void }) {
+  if (!item) return <Empty text="未找到已办记录"/>
+  if (item.record_kind === "approval_run" || item.record_kind === "launched") return <DoneDetail item={item}/>
+  const activity=parseBusinessActivityContent(item)
+  if (activity) {
+    const entries=businessEntries({...activity.input,...activity.output})
+    return <div className="cluster-detail-page"><div className="cluster-detail-head"><div><span className="status status-accent">业务模型</span><h3 className="detail-title">{activity.displayFileName || item.title}</h3><p className="font-mono">{activity.fileName || "—"}</p></div><em className={`status ${phaseClass(activity.phase)}`}>{activity.phase}</em></div><div className="meta-grid"><span>所属模型<b>{item.model}</b></span><span>发起人<b>{item.sender}</b></span><span>业务模型办结时间<b>{item.handled || item.date}</b></span><span>当前阶段<b>{activity.phase}</b></span></div><h4 className="section-title">业务模型内容</h4><div className="business-detail-grid">{entries.map(entry=><div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{entries.length === 0 && <div className="business-empty">业务模型已归档，暂无可展示的业务字段</div>}</div><h4 className="section-title">阶段说明</h4><div className="content-box">{activity.phase === "有效阶段" ? "审批模型已经完成并确认业务生效。" : activity.phase.includes("终止") ? "审批模型已经终止或未通过，本业务未进入有效阶段。" : "业务模型已经完成并进入申请阶段，审批模型仍在运行或等待形成最终审批结论。"}</div><h4 className="section-title">关联模型</h4><div className="cluster-model-list">{activity.approval ? <button className="cluster-model-entry" onClick={()=>onOpenModel(completedRelatedRecord(item,activity.approval!,"approval"))}><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small className="font-mono">{String(activity.approval.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(activity.approval.status)}`}>{relatedModelStatus(activity.approval.status)}</span><span className="cluster-model-open">查看审批模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small>业务模型数字化库触发后生成审批模型文件</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}{activity.smart ? <button className="cluster-model-entry" onClick={()=>onOpenModel(completedRelatedRecord(item,activity.smart!,"smart"))}><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small className="font-mono">{String(activity.smart.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(activity.smart.status)}`}>{relatedModelStatus(activity.smart.status)}</span><span className="cluster-model-open">查看智选模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small>审批模型归档后由数字化库触发</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}</div></div>
+  }
+  let content:Record<string,unknown>={}
+  try { const parsed=JSON.parse(String(item.content ?? "{}")); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) content=parsed as Record<string,unknown> } catch { /* historical text content */ }
+  const businessData=content.businessData && typeof content.businessData === "object" && !Array.isArray(content.businessData) ? content.businessData as Record<string,unknown> : {}
+  const fields=Array.isArray(content.businessFields) ? content.businessFields.filter((value):value is Record<string,unknown>=>Boolean(value)&&typeof value === "object"&&!Array.isArray(value)).map((field,index)=>({key:String(field.key ?? ""),label:String(field.label ?? field.key ?? "字段"),order:Number(field.order ?? index)})).filter(field=>field.key) : []
+  const entries=businessEntries(businessData,fields)
+  return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>{item.model}</b></span><span>办理来源<b>{item.sender}</b></span><span>办理时间<b>{item.handled || item.date}</b></span><span>办理结果<b className="text-[#27805f]">{item.result}</b></span></div>{entries.length > 0 && <><h4 className="section-title">办理时业务内容</h4><div className="business-detail-grid">{entries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}</div></>}<h4 className="section-title">办理记录</h4><div className="business-detail-grid"><div><span>当前环节</span><b>{String(content.currentStep ?? "—")}</b></div><div><span>审批路径</span><b>{Array.isArray(content.route) ? content.route.map(String).join(" → ") : "—"}</b></div><div><span>到达时间</span><b>{String(content.approvalArrivedAt ?? "—").slice(0,19).replace("T"," ")}</b></div><div><span>耗时</span><b>{approvalElapsedDisplay(content.approvalArrivedAt, item.handled_at ?? item.handled)}</b></div></div></div>
+}
+
+type CompletedModelContent = { type:string; runId:string; runKind:string; fileName:string; displayFileName:string; digitalId:string; sourceRunId:string; sourceModelName:string; input:Record<string,unknown>; output:Record<string,unknown>; status:string; phase:string; approval:Record<string,unknown>|null; smart:Record<string,unknown>|null }
+function parseCompletedModelContent(item: DoneRecord): CompletedModelContent | null {
+  if (item.record_kind !== "completed_run") return null
+  try {
+    const parsed=JSON.parse(String(item.content ?? "{}")) as Record<string,unknown>
+    if (parsed.type !== "completed_model_v1") return null
+    const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
+    return { type:"completed_model_v1", runId:String(parsed.runId ?? item.id), runKind:String(parsed.runKind ?? "business"), fileName:String(parsed.fileName ?? ""), displayFileName:String(parsed.displayFileName ?? ""), digitalId:String(parsed.digitalId ?? ""), sourceRunId:String(parsed.sourceRunId ?? ""), sourceModelName:String(parsed.sourceModelName ?? ""), input:object(parsed.input), output:object(parsed.output), status:String(parsed.status ?? item.status), phase:String(parsed.phase ?? ""), approval:parsed.approval && typeof parsed.approval === "object" && !Array.isArray(parsed.approval) ? parsed.approval as Record<string,unknown> : null, smart:parsed.smart && typeof parsed.smart === "object" && !Array.isArray(parsed.smart) ? parsed.smart as Record<string,unknown> : null }
+  } catch { return null }
+}
+function completedRelatedRecord(parent: DoneRecord, raw: Record<string,unknown>, kind:"approval"|"smart"): DoneRecord {
+  const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
+  const fileName=String(raw.fileName ?? "")
+  const displayFileName=String(raw.displayFileName ?? "")
+  const status=String(raw.status ?? "运行中")
+  return {
+    ...parent,
+    id:`${parent.id}:${kind}:${String(raw.runId ?? fileName)}`,
+    title:displayFileName || fileName || (kind === "approval" ? "审批模型" : "智选模型"),
+    model:kind === "approval" ? "审批模型" : "智选模型",
+    status,
+    result:status === "已归档" ? "已办结" : status,
+    record_kind:kind === "approval" ? "approval_run" : "launched",
+    content:JSON.stringify({ type:"model_run", runKind:kind, runId:String(raw.runId ?? ""), fileName, displayFileName, digitalId:String(raw.digitalId ?? ""), sourceRunId:String(raw.sourceRunId ?? ""), sourceModelName:String(raw.sourceModelName ?? (kind === "approval" ? parent.model : "审批模型")), status, input:object(raw.input), output:object(raw.output) }),
+  }
+}
+function CompletedTable({ items, onOpen }: { items: DoneRecord[]; onOpen:(x:DoneRecord)=>void }) {
+  return <div className="table-wrap"><div className="data-table completed-stage-cols table-head"><span>文件名</span><span>所属模型</span><span>当前阶段</span><span>完成时间</span><span>状态</span><span>操作</span></div>{items.map(item => { const run=parseCompletedModelContent(item); const stage=run?.runKind === "business" ? (run.phase || "申请阶段") : "模型办结"; return <button key={item.id} onClick={() => onOpen(item)} className="data-table completed-stage-cols table-row"><span className="completed-file-cell"><b className="font-mono">{run?.fileName || item.title}</b>{run?.displayFileName && run.displayFileName !== run.fileName && <small>{run.displayFileName}</small>}</span><span>{item.model}</span><span><em className={`status ${run?.runKind === "business" ? phaseClass(stage) : "success"}`}>{stage}</em></span><span>{item.handled || item.date}</span><span><em className="status success">已办结</em></span><span className="link">查看模型</span></button> })}{items.length === 0 && <Empty text="当前没有办结模型"/>}</div>
+}
+
+function CompletedDetail({ item, onOpenModel }: { item?:DoneRecord; onOpenModel:(x:DoneRecord)=>void }) {
+  if (!item) return <Empty text="未找到办结模型"/>
+  const completed=parseCompletedModelContent(item)
+  if (!completed) return <DoneDetail item={item}/>
+  if (completed.runKind === "approval" || completed.runKind === "smart") {
+    return <DoneDetail item={{...item,record_kind:completed.runKind === "approval" ? "approval_run" : "launched",content:JSON.stringify({type:"model_run",runKind:completed.runKind,runId:completed.runId,fileName:completed.fileName,displayFileName:completed.displayFileName,digitalId:completed.digitalId,sourceRunId:completed.sourceRunId,sourceModelName:completed.sourceModelName,status:completed.status,input:completed.input,output:completed.output})}}/>
+  }
+  const entries=businessEntries({...completed.input,...completed.output})
+  const phase=completed.phase || "申请阶段"
+  return <div className="cluster-detail-page"><div className="cluster-detail-head"><div><span className="status status-accent">{item.model}</span><h3 className="detail-title">{completed.displayFileName || item.title}</h3><p className="font-mono">{completed.fileName || "—"}</p></div><em className={`status ${phaseClass(phase)}`}>{phase}</em></div><div className="meta-grid"><span>所属模型<b>{item.model}</b></span><span>模型所有人<b>{item.sender}</b></span><span>办结时间<b>{item.handled || item.date}</b></span><span>当前阶段<b>{phase}</b></span><span>数字化标识<b className="font-mono text-xs">{completed.digitalId || "—"}</b></span></div><h4 className="section-title">模型结果</h4><div className="business-detail-grid">{entries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{entries.length === 0 && <div className="business-empty">本模型已完成并形成归档结果</div>}</div><h4 className="section-title">关联模型</h4><div className="cluster-model-list">{completed.approval ? <button className="cluster-model-entry" onClick={() => onOpenModel(completedRelatedRecord(item,completed.approval!,"approval"))}><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small className="font-mono">{String(completed.approval.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(completed.approval.status)}`}>{relatedModelStatus(completed.approval.status)}</span><span className="cluster-model-open">查看审批模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind approval">审批</span><span className="cluster-model-main"><b>审批模型</b><small>尚未形成审批模型运行文件</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}{completed.smart ? <button className="cluster-model-entry" onClick={() => onOpenModel(completedRelatedRecord(item,completed.smart!,"smart"))}><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small className="font-mono">{String(completed.smart.fileName ?? "—")}</small></span><span className={`status ${relatedModelStatusClass(completed.smart.status)}`}>{relatedModelStatus(completed.smart.status)}</span><span className="cluster-model-open">查看智选模型 <Icon name="chevron" size={12}/></span></button> : <div className="cluster-model-entry unavailable"><span className="cluster-model-kind smart">智选</span><span className="cluster-model-main"><b>智选模型</b><small>审批模型办结入库后由数字化库触发</small></span><span className="status">未启动</span><span className="cluster-model-open muted">暂无模型记录</span></div>}</div></div>
+}
+
 function parseRunDoneContent(item: DoneRecord) {
   if (!(["launched", "approval_run"] as Array<DoneRecord["record_kind"]>).includes(item.record_kind)) return null
   try {
@@ -507,46 +584,105 @@ function parseRunDoneContent(item: DoneRecord) {
     if (parsed.type !== "model_run") return null
     const input = parsed.input && typeof parsed.input === "object" && !Array.isArray(parsed.input) ? parsed.input as Record<string, unknown> : {}
     const output = parsed.output && typeof parsed.output === "object" && !Array.isArray(parsed.output) ? parsed.output as Record<string, unknown> : {}
-    return { input, output, fileName: String(parsed.fileName ?? ""), digitalId: String(parsed.digitalId ?? ""), sourceModelName: String(parsed.sourceModelName ?? input.sourceModelName ?? ""), runKind: String(parsed.runKind ?? (item.record_kind === "approval_run" ? "approval" : "manual")), status: String(parsed.status ?? item.result) }
+    return { input, output, runId:String(parsed.runId ?? ""), fileName: String(parsed.fileName ?? ""), displayFileName:String(parsed.displayFileName ?? ""), digitalId: String(parsed.digitalId ?? ""), sourceRunId:String(parsed.sourceRunId ?? ""), sourceModelName: String(parsed.sourceModelName ?? input.sourceModelName ?? ""), runKind: String(parsed.runKind ?? (item.record_kind === "approval_run" ? "approval" : "manual")), status: String(parsed.status ?? item.result) }
   } catch { return null }
 }
+type RunDetailView = { id:string; modelName:string; ownerName:string; fileName:string; displayFileName:string; digitalId:string; status:string; sourceRunId:string; triggerMode:string; createdAt:string|null; completedAt:string|null }
+type RunDigitalRecordView = { libraryName:string; digitalId:string; identifierValues:Record<string,unknown>; data:Record<string,unknown>; createdAt:string|null }
+type SmartRunDetailPayload = { run:RunDetailView; sourceApproval:RunDetailView|null; businessRun:RunDetailView|null; smartDigitalRecord:RunDigitalRecordView|null; sourceApprovalDigitalRecord:RunDigitalRecordView|null; businessDigitalRecord:RunDigitalRecordView|null }
+function SmartRunDetail({ item, snapshot }: { item:DoneRecord; snapshot:NonNullable<ReturnType<typeof parseRunDoneContent>> }) {
+  const [detail,setDetail]=useState<SmartRunDetailPayload|null>(null)
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState("")
+  const runId=snapshot.runId
+  useEffect(()=>{
+    let cancelled=false
+    if (!runId) { setDetail(null); setError("未找到本次智选模型运行记录"); setLoading(false); return ()=>{cancelled=true} }
+    setLoading(true); setError("")
+    apiFetch<{detail:SmartRunDetailPayload}>(`/api/model-runs/${encodeURIComponent(runId)}/detail`).then(result=>{ if (!cancelled) setDetail(result.detail) }).catch(()=>{ if (!cancelled) { setDetail(null); setError("未找到本次智选模型运行记录") } }).finally(()=>{ if (!cancelled) setLoading(false) })
+    return ()=>{cancelled=true}
+  },[runId])
+  const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
+  const objectArray=(value:unknown)=>Array.isArray(value) ? value.filter((entry):entry is Record<string,unknown>=>Boolean(entry)&&typeof entry === "object"&&!Array.isArray(entry)) : []
+  const text=(value:unknown,fallback="—")=>value === undefined || value === null || String(value).trim() === "" ? fallback : String(value)
+  const listText=(value:unknown,separator="、",fallback="无")=>Array.isArray(value) ? (value.map(String).filter(Boolean).join(separator)||fallback) : text(value,fallback)
+  const timeText=(value:unknown)=>value ? String(value).slice(0,19).replace("T"," ") : "—"
+  const libraryBusinessData=(record:RunDigitalRecordView|null)=>{
+    const data=object(record?.data)
+    const nestedInput=object(data.input)
+    const nestedOutput=object(data.output)
+    const direct=Object.fromEntries(Object.entries(data).filter(([key])=>!["runId","fileName","displayFileName","digitalId","input","output","模型运行记录","模型文件名","中文显示文件名","数字化标识"].includes(key)))
+    return {...nestedInput,...nestedOutput,...direct}
+  }
+  if (loading) return <div><h3 className="detail-title !mt-0">{item.title || snapshot.displayFileName || snapshot.fileName || "智选模型"}</h3><div className="content-box">正在读取本次智选模型数字化库记录…</div></div>
+  if (!detail) return <div><h3 className="detail-title !mt-0">{item.title || snapshot.displayFileName || snapshot.fileName || "智选模型"}</h3><div className="meta-grid"><span>所属模型<b>智选模型</b></span><span>模型文件名<b className="font-mono text-xs">{snapshot.fileName || "—"}</b></span><span>来源模型<b>{snapshot.sourceModelName || "审批模型"}</b></span><span>运行标识<b className="font-mono text-xs">{runId || "—"}</b></span></div><h4 className="section-title">模型信息</h4><div className="content-box">{error || "未找到本次智选模型运行记录"}</div></div>
+  const run=detail.run
+  const approval=detail.sourceApproval
+  const business=detail.businessRun
+  const smartDigital=object(detail.smartDigitalRecord?.data)
+  const approvalDigital=object(detail.sourceApprovalDigitalRecord?.data)
+  const businessData=libraryBusinessData(detail.businessDigitalRecord)
+  const businessContentEntries=businessEntries(businessData)
+  const approvalResult=text(approvalDigital["审批结果"],"—")
+  const sourceApprovalFile=text(approvalDigital["模型文件名"] ?? approval?.fileName,"—")
+  const businessModelName=text(smartDigital["业务模型"] ?? business?.modelName,"—")
+  const businessFileName=text(smartDigital["业务模型文件名"] ?? detail.businessDigitalRecord?.data?.["模型文件名"] ?? business?.fileName,"—")
+  const businessDigitalId=text(smartDigital["业务数字化标识"] ?? detail.businessDigitalRecord?.digitalId ?? business?.digitalId,"—")
+  const statisticsState=text(smartDigital["统计分析状态"],"未形成")
+  const statisticsFile=text(smartDigital["统计分析模型文件名"],"—")
+  const pendingRaw=smartDigital["待处理数字化标识集合"]
+  const associatedRaw=smartDigital["有关联数字化标识集合"]
+  const specialResult=text(smartDigital["特殊判断结果"],"未形成")
+  const normalResult=text(smartDigital["正常关联判断结果"],"未形成")
+  const triggeredRaw=smartDigital["关联模型集合"]
+  const triggerDetails=objectArray(smartDigital["关联模型启动明细"])
+  const identifierCounts=objectArray(smartDigital["各数字化标识有效数据条数"])
+  const triggerCount=text(smartDigital["关联模型启动次数"],"0")
+  const decision=text(smartDigital["智选结果"],"—")
+  return <div><h3 className="detail-title !mt-0">{run.displayFileName || run.fileName || item.title || "智选模型"}</h3>
+    <h4 className="section-title">模型信息</h4><div className="business-detail-grid"><div><span>所属模型</span><b>智选模型</b></div><div><span>模型状态</span><b>{text(run.status)}</b></div><div className="wide"><span>智选模型文件名</span><b className="font-mono text-xs">{text(run.fileName)}</b></div><div><span>完成/归档时间</span><b>{timeText(run.completedAt)}</b></div><div><span>来源审批模型</span><b>{approval?.modelName || "审批模型"}</b></div><div className="wide"><span>来源审批模型文件名</span><b className="font-mono text-xs">{sourceApprovalFile}</b></div></div>
+    <h4 className="section-title">业务内容</h4><div className="business-detail-grid"><div><span>原业务模型</span><b>{businessModelName}</b></div><div className="wide"><span>原业务模型文件名</span><b className="font-mono text-xs">{businessFileName}</b></div><div><span>原业务数字化标识</span><b className="font-mono text-xs">{businessDigitalId}</b></div>{businessContentEntries.map(entry=><div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{businessContentEntries.length === 0 && <div className="wide business-empty">未找到原业务模型数字化库记录</div>}</div>
+    <h4 className="section-title">审批结果</h4><div className="business-detail-grid"><div><span>审批结果</span><b>{approvalResult}</b></div><div className="wide"><span>审批模型文件名</span><b className="font-mono text-xs">{sourceApprovalFile}</b></div></div>
+    <h4 className="section-title">统计分析</h4><div className="business-detail-grid"><div><span>统计分析状态</span><b>{statisticsState}</b></div><div className="wide"><span>统计分析模型文件名</span><b className="font-mono text-xs">{statisticsFile}</b></div></div>
+    <h4 className="section-title">智选判断</h4><div className="business-detail-grid"><div className="wide"><span>待处理数字化标识集合</span><b className="font-mono text-xs">{listText(pendingRaw)}</b></div><div className="wide"><span>有关联数字化标识集合</span><b className="font-mono text-xs">{listText(associatedRaw)}</b></div><div><span>特殊判断结果</span><b>{specialResult}</b></div><div><span>正常关联判断结果</span><b>{normalResult}</b></div>{identifierCounts.length > 0 && <div className="wide"><span>各数字化标识有效数据条数</span><b>{identifierCounts.map(row=>`${text(row["数字化标识"])}：${text(row["有效数据条数"],"0")}条`).join("；")}</b></div>}<div className="wide"><span>关联模型集合</span><b>{listText(triggeredRaw," → ")}</b></div><div><span>关联模型启动次数</span><b>{triggerCount}</b></div><div className="wide"><span>智选结果</span><b>{decision}</b></div></div>
+    <h4 className="section-title">关联模型启动明细</h4>{triggerDetails.length ? <div className="approval-record-list">{triggerDetails.map((detailRow,index)=><div className="approval-record-card" key={`智选触发-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{text(detailRow["目标模型"] ?? detailRow["关联模型"],"关联模型")}</b><em className="status">{text(detailRow["启动结果"] ?? detailRow["触发状态"],"已触发")}</em></div><div className="business-detail-grid"><div><span>来源数字化标识</span><b className="font-mono text-xs">{text(detailRow["来源数字化标识"])}</b></div><div><span>关联数字化标识</span><b className="font-mono text-xs">{text(detailRow["关联数字化标识"])}</b></div><div><span>数据序号</span><b>{text(detailRow["数据序号"])}</b></div><div><span>触发类型</span><b>{text(detailRow["关联类型"] ?? detailRow["触发类型"],"正常")}</b></div><div className="wide"><span>目标模型文件名</span><b className="font-mono text-xs">{text(detailRow["目标模型文件名"] ?? detailRow["模型文件名"])}</b></div></div></div>)}</div> : <div className="content-box">无</div>}</div>
+}
+
 function DoneDetail({ item }: { item?: DoneRecord }) {
   if (!item) return <Empty text="未找到已办记录"/>
-  const cluster = parseModelClusterContent(item)
-  if (cluster) {
-    const stage = clusterStage(cluster)
-    const entries = businessEntries({ ...cluster.input, ...cluster.output })
-    const timeline = clusterApprovalTimeline(cluster.approval)
-    const firstPending = timeline.findIndex(step => !(step.result || step.handledAt || ["已完成","已退回"].includes(step.status)))
-    const approvalState = !cluster.approval ? "待启动" : cluster.approval.status === "已归档" ? "已完成" : cluster.approval.status || "审批中"
-    const smartState = !cluster.smart ? "未启动" : cluster.smart.status === "已归档" ? "已完成" : cluster.smart.status || "运行中"
-    return <div className="cluster-detail-page">
-      <div className="cluster-detail-head"><div><span className="status status-accent">模型簇</span><h3 className="detail-title">{cluster.displayFileName || item.title}</h3><p className="font-mono">{cluster.fileName || "—"}</p></div><em className={`status ${stage === "有效阶段" ? "success" : "warning"}`}>{stage}</em></div>
-      <div className="meta-grid"><span>业务模型<b>{item.model}</b></span><span>发起人<b>{item.sender}</b></span><span>业务入库时间<b>{item.handled}</b></span><span>当前阶段<b>{stage}</b></span></div>
-      <h4 className="section-title">模型簇进度</h4>
-      <div className="model-cluster-node-grid detail">
-        <div className="model-cluster-node done"><span>1</span><div><b>{item.model}</b><small>业务模型已归档入库，形成申请阶段</small><em className="font-mono">{cluster.fileName || "—"}</em></div><strong>已完成</strong></div>
-        <div className={`model-cluster-node ${cluster.approval?.status === "已归档" ? "done" : cluster.approval ? "current" : "pending"}`}><span>2</span><div><b>审批模型</b><small>{cluster.approval ? (cluster.approval.status === "已归档" ? "审批模型已完成，模型簇进入有效阶段" : "审批模型正在运行") : "等待业务模型入库后触发"}</small><em className="font-mono">{cluster.approval?.fileName || "—"}</em></div><strong>{approvalState}</strong></div>
-        <div className={`model-cluster-node ${cluster.smart?.status === "已归档" ? "done" : cluster.smart ? "current" : "pending"}`}><span>3</span><div><b>智选模型</b><small>{cluster.smart ? (cluster.smart.status === "已归档" ? "智选判断已完成" : "智选模型正在运行") : "等待审批模型完成后触发"}</small><em className="font-mono">{cluster.smart?.fileName || "—"}</em></div><strong>{smartState}</strong></div>
-      </div>
-      <h4 className="section-title">审批模型进度</h4>
-      <div className="cluster-approval-progress-panel detail"><div className="cluster-progress-head"><div><b>{cluster.approval ? cluster.approval.displayFileName || "审批模型" : "审批模型"}</b><small>{cluster.approval ? cluster.approval.result || cluster.approval.status : "尚未启动"}</small></div>{cluster.approval && <span>{timeline.length} 个审批环节</span>}</div>
-        {!cluster.approval ? <div className="cluster-progress-empty">业务模型已经完成入库，当前为申请阶段；审批模型启动后将在此显示逐级审批进度。</div> : timeline.length ? <div className="approval-progress">{timeline.map((step, index) => { const finished = Boolean(step.result || step.handledAt || ["已完成","已退回"].includes(step.status)) || cluster.approval?.status === "已归档"; const current = !finished && (firstPending < 0 ? index === timeline.length - 1 : index === firstPending); return <div key={`${step.step}-${index}`} className={finished ? "done" : current ? "current" : "pending"}><i>{finished ? "✓" : index + 1}</i><span><b>{step.step}</b><small>{[step.approver, step.result || step.status || (current ? "待办理" : "待流转"), step.handledAt].filter(Boolean).join(" · ")}</small></span></div>})}</div> : <div className="cluster-progress-empty">审批模型已启动，暂未生成可展示的审批环节。</div>}
-      </div>
-      <h4 className="section-title">业务模型内容</h4><div className="business-detail-grid">{entries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{entries.length === 0 && <div className="business-empty">业务模型已归档，暂无可展示的业务字段</div>}</div>
-    </div>
-  }
-  const smart = parseSmartTodoContent(item)
-  if (smart) {
-    const entries = businessEntries(smart.businessData)
-    return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>智选模型</b></span><span>业务来源<b>{smart.businessSourceModelName}</b></span><span>查看时间<b>{item.handled}</b></span><span>状态<b className="text-[#27805f]">{item.result}</b></span></div><h4 className="section-title">业务内容</h4><div className="business-detail-grid">{entries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{entries.length === 0 && <div className="business-empty">暂无可展示的业务字段</div>}</div><h4 className="section-title">智选依据</h4><div className="business-detail-grid"><div><span>业务模型</span><b>{smart.businessSourceModelName}</b></div><div className="wide"><span>文件名</span><b className="font-mono text-xs">{smart.businessFileName || "—"}</b></div><div className="wide"><span>中文显示名称</span><b>{smart.businessDisplayFileName || "—"}</b></div><div><span>数字化标识</span><b className="font-mono text-xs">{smart.businessDigitalId || "—"}</b></div><div><span>关联数字化标识</span><b className="font-mono text-xs">{smart.associatedDigitalIds.length ? smart.associatedDigitalIds.join("、") : "无"}</b></div></div><h4 className="section-title">智选结果</h4><div className="business-detail-grid"><div><span>审批结果</span><b>{smart.approvalResult || "—"}</b></div><div className="wide"><span>智选判断</span><b>{smart.smartDecision || `本模型（${smart.businessSourceModelName}）没有后续关联的模型`}</b></div><div className="wide"><span>后续关联模型</span><b>{smart.triggeredModels.length ? smart.triggeredModels.join(" → ") : "无"}</b></div>{smart.triggerError && <div className="wide"><span>触发状态</span><b className="text-[#bb4545]">{smart.triggerError}</b></div>}</div></div>
-  }
   const run = parseRunDoneContent(item)
   const runEntries = run ? businessEntries({ ...run.input, ...run.output }) : []
   if (run?.runKind === "approval") {
-    const approvalProcess = Array.isArray(run.output.approvalProcess) ? run.output.approvalProcess.filter((step): step is Record<string, unknown> => Boolean(step) && typeof step === "object" && !Array.isArray(step)) : []
-    return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>审批模型</b></span><span>业务来源<b>{run.sourceModelName || "业务事项"}</b></span><span>归档时间<b>{item.handled}</b></span><span>审批结果<b className="text-[#27805f]">{String(run.output.approvalStatus ?? run.output.approvalResult ?? item.result)}</b></span></div><h4 className="section-title">业务内容</h4><div className="business-detail-grid">{runEntries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{runEntries.length === 0 && <div className="business-empty">审批模型已完成并归档</div>}</div><h4 className="section-title">审批记录</h4>{approvalProcess.length ? <div className="approval-progress">{approvalProcess.map((step, index) => <div className="done" key={`${String(step.step ?? "审批")}-${index}`}><i>✓</i><span><b>{String(step.step ?? `审批步骤${index + 1}`)}</b><small>{String(step.approver ?? "")} · {String(step.result ?? "已完成")}{step.handledAt ? ` · ${String(step.handledAt).slice(0,16).replace("T"," ")}` : ""}</small></span></div>)}</div> : <div className="content-box">审批模型已归档，暂无可展示的逐步审批记录。</div>}</div>
+    const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
+    const objectArray=(value:unknown)=>Array.isArray(value) ? value.filter((item):item is Record<string,unknown>=>Boolean(item)&&typeof item === "object"&&!Array.isArray(item)) : []
+    const approvalProcess = objectArray(run.output["审批办理记录"] ?? run.output.approvalProcess)
+    const approverCalculation = objectArray(run.output["审批人计算"])
+    const pathCalculation = object(run.output["审批路径计算"])
+    const thresholdCalculation = objectArray(run.output["命中数字化标识阈值"])
+    const legacyThresholds = objectArray(run.output.approvalThresholdVariables)
+    const businessContent=object(run.output.approvalBusinessContent)
+    const businessData=Object.keys(object(businessContent.businessData)).length ? object(businessContent.businessData) : (()=>{ const sourceInput=object(run.input.sourceInput); const sourceOutput=object(run.input.sourceOutput); return {...sourceInput,...sourceOutput} })()
+    const businessFields:BusinessFieldView[]=Array.isArray(businessContent.businessFields) ? businessContent.businessFields.filter((value):value is Record<string,unknown>=>Boolean(value)&&typeof value === "object"&&!Array.isArray(value)).map((field,index)=>({key:String(field.key ?? ""),label:String(field.label ?? "业务字段"),digitalId:String(field.digitalId ?? "") || undefined,type:String(field.type ?? "") || undefined,order:Number(field.order ?? index)})).filter(field=>field.key) : []
+    const approvalEntries=businessEntries(businessData,businessFields)
+    const legacyEvidence=object(run.output.approvalComputationEvidence)
+    const organizationPath=Array.isArray(pathCalculation["组织逐级路径"]) ? (pathCalculation["组织逐级路径"] as unknown[]).map(String).filter(Boolean) : Array.isArray(run.output.approvalOrganizationPath) ? run.output.approvalOrganizationPath.map(String).filter(Boolean) : []
+    const routeValue=run.output["正式审批路径"] ?? run.output.approvalRoute
+    const formalRoute=Array.isArray(routeValue) ? routeValue.map(String).filter(Boolean).join(" → ") : String(routeValue ?? "—")
+    const approvalStatus=String(run.output["审批状态"] ?? run.output.approvalStatus ?? item.result)
+    const approvalResult=String(run.output["审批结果"] ?? run.output.approvalResult ?? approvalStatus)
+    const currentStep=String(run.output["当前审批环节"] ?? run.output.approvalCurrentStep ?? (approvalProcess.length ? "已完成全部环节" : "待进入审批环节"))
+    const currentApprover=String(run.output["当前审批人"] ?? run.output.approvalCurrentApprover ?? "—")
+    const baseTarget=String(pathCalculation["基础审批目标"] ?? pathCalculation["基础审批目标层级"] ?? run.output["基础审批目标"] ?? run.output["基础审批目标层级"] ?? legacyEvidence.baseAdministrativeTarget ?? "—")
+    const finalTarget=String(pathCalculation["最终审批目标"] ?? pathCalculation["最终审批目标层级"] ?? run.output["最终审批目标"] ?? run.output["最终审批目标层级"] ?? legacyEvidence.adjustedAdministrativeTarget ?? run.output.approvalAdministrativeLevel ?? "—")
+    const technicalTarget=String(pathCalculation["最终技术业务审查目标层级"] ?? run.output["技术业务审查目标层级"] ?? legacyEvidence.adjustedTechnicalTarget ?? run.output.approvalTechnicalLevel ?? "—")
+    return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>审批模型</b></span><span>业务来源<b>{String(businessContent.sourceModelName ?? run.sourceModelName ?? "业务事项")}</b></span><span>模型状态<b>{run.status || item.result}</b></span><span>审批结果<b className="text-[#27805f]">{approvalResult}</b></span></div>
+      <h4 className="section-title">审批模型</h4><div className="business-detail-grid"><div className="wide"><span>审批模型文件名</span><b className="font-mono text-xs">{run.fileName || "—"}</b></div><div className="wide"><span>被审批业务模型文件名</span><b className="font-mono text-xs">{String(businessContent.sourceFileName ?? run.input["前序模型文件名"] ?? run.input.sourceFileName ?? "—")}</b></div><div><span>当前审批环节</span><b>{currentStep}</b></div><div><span>当前审批人</span><b>{currentApprover}</b></div><div><span>审批状态</span><b>{approvalStatus}</b></div><div className="wide"><span>正式审批路径</span><b>{formalRoute}</b></div></div>
+      <h4 className="section-title">业务内容</h4><div className="business-detail-grid">{approvalEntries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{approvalEntries.length === 0 && <div className="business-empty">来源业务模型暂无可展示业务内容</div>}</div>
+      <h4 className="section-title">审批路径计算</h4><div className="business-detail-grid"><div><span>基础审批目标</span><b>{baseTarget}</b></div><div><span>最终审批目标</span><b>{finalTarget}</b></div><div><span>技术/业务审查目标层级</span><b>{technicalTarget}</b></div><div><span>申请人所在部门</span><b>{String(pathCalculation["申请人所在部门"] ?? legacyEvidence.startDepartment ?? "—")}</b></div>{organizationPath.length > 0 && <div className="wide"><span>组织逐级路径</span><b>{organizationPath.join(" → ")}</b></div>}<div className="wide"><span>正式审批路径</span><b>{formalRoute}</b></div>{(thresholdCalculation.length || legacyThresholds.length) > 0 && <div className="wide"><span>命中数字化标识阈值</span><b>{thresholdCalculation.length ? thresholdCalculation.map(value => `${String(value["阈值类型"] ?? "阈值")}：${String(value["本次业务值"] ?? "—")} ≥ ${String(value["阈值"] ?? "—")} → ${String(value["调整审批层级"] ?? "")}`).join("；") : legacyThresholds.map(value => `${String(value.thresholdType ?? "阈值")}：${String(value.actualValue ?? "—")} ≥ ${String(value.thresholdValue ?? "—")} → ${String(value.approvalLevel ?? "")}`).join("；")}</b></div>}</div>
+      <h4 className="section-title">审批人计算</h4>{approverCalculation.length ? <div className="approval-record-list">{approverCalculation.map((calc,index)=><div className="approval-record-card" key={`审批人计算-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{String(calc["环节名称"] ?? `审批环节${index+1}`)}</b><em className="status">{String(calc["环节类型"] ?? "审批")}</em></div><div className="business-detail-grid"><div><span>审批人</span><b>{String(calc["审批人"] ?? "待匹配")}</b></div><div><span>审批组织</span><b>{String(calc["审批组织"] ?? "—")}</b></div><div><span>审批层级/岗位</span><b>{String(calc["审批层级岗位"] ?? "—")}</b></div><div><span>规定时限</span><b>{approvalTimeoutDisplay(calc["规定时限"])}</b></div></div></div>)}</div> : <div className="content-box">历史审批记录未保存独立的审批人计算快照；可从办理记录中的实际审批人追溯。</div>}
+      <h4 className="section-title">审批办理记录</h4>{approvalProcess.length ? <div className="approval-record-list">{approvalProcess.map((step,index)=>{ const calc=approverCalculation[index] ?? {}; return <div className="approval-record-card" key={`${String(step.step ?? "审批")}-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{String(step.step ?? `审批步骤${index+1}`)}</b><em className={`status ${step.result === "不同意" || step.result === "退回修改" ? "danger" : "success"}`}>{String(step.result ?? "已办理")}</em></div><div className="business-detail-grid"><div><span>审批/审查人</span><b>{String(step.approver ?? calc["审批人"] ?? "—")}</b></div><div><span>耗时</span><b>{approvalElapsedDisplay(step.arrivedAt,step.handledAt)}</b></div><div><span>到达时间</span><b>{String(step.arrivedAt ?? "—").slice(0,19).replace("T"," ")}</b></div><div><span>办理时间</span><b>{String(step.handledAt ?? "—").slice(0,19).replace("T"," ")}</b></div></div></div>})}</div> : <div className="content-box">审批模型当前暂无已完成的办理记录；模型仍在运行时可查看当前审批人和正式审批路径。</div>}</div>
   }
+  if (run?.runKind === "smart") return <SmartRunDetail item={item} snapshot={run}/>
   return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>{item.model}</b></span><span>{run ? "发起人" : "办理人"}<b>{item.sender}</b></span><span>{run ? "完成时间" : "处理时间"}<b>{item.handled}</b></span><span>{run ? "运行状态" : "处理结果"}<b className="text-[#27805f]">{item.result}</b></span></div>{run ? <><h4 className="section-title">业务内容</h4><div className="business-detail-grid">{runEntries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{runEntries.length === 0 && <div className="business-empty">本次模型已完成并归档</div>}</div></> : <><h4 className="section-title">处理记录</h4><div className="content-box">本事项已完成处理，当前页面仅供查看，不再提供办理操作。</div></>}</div>
 }
 function libraryValue(value: unknown) {
@@ -586,7 +722,6 @@ function DigitalLibrary() {
   const [loadingRecords, setLoadingRecords] = useState(false)
   const [term, setTerm] = useState("")
   const [recordTerm, setRecordTerm] = useState("")
-  const [libraryFilter, setLibraryFilter] = useState<"all"|"standard"|"model">("all")
   const [activeTab, setActiveTab] = useState<DigitalLibraryTab>("records")
   const [selectedRecord, setSelectedRecord] = useState<DigitalLibraryRecord | null>(null)
 
@@ -609,38 +744,27 @@ function DigitalLibrary() {
 
   const selected = libraries.find(item => item.id === selectedId)
   const filterText = term.trim().toLowerCase()
-  const visibleLibraries = libraries.filter(item => {
-    const categoryOk = libraryFilter === "all" || (libraryFilter === "standard" ? item.isStandard : !item.isStandard)
-    if (!categoryOk) return false
-    return `${item.name} ${item.modelName ?? ""} ${item.digitalId ?? ""} ${item.columns.map(c => `${c.displayName} ${c.digitalId}`).join(" ")}`.toLowerCase().includes(filterText)
-  })
+  const visibleLibraries = libraries.filter(item => `${item.name} ${item.modelName ?? ""} ${item.digitalId ?? ""} ${item.columns.map(c => `${c.displayName} ${c.digitalId}`).join(" ")}`.toLowerCase().includes(filterText))
   const columns = selected?.columns ?? []
   const filteredRecords = records.filter(record => {
     const search = recordTerm.trim().toLowerCase()
     if (!search) return true
     return [record.fileName, record.displayFileName, record.recordId].join(" ").toLowerCase().includes(search)
   })
-  const standardCount = libraries.filter(item => item.isStandard).length
-  const modelCount = libraries.length - standardCount
   const tabItems: {key:DigitalLibraryTab;label:string;hint:string}[] = [
     {key:"records",label:"文件记录",hint:`${selected?.recordCount ?? 0} 个`},
     {key:"fields",label:"字段设计",hint:`${columns.length} 个字段`},
-    {key:"relations",label:"模型关联",hint:selected?.modelName ? "1 个来源模型" : "系统标准"},
-    {key:"permissions",label:"权限",hint:selected?.isStandard ? "标准数据策略" : "运行数据策略"},
+    {key:"relations",label:"模型关联",hint:selected?.modelName ? "1 个来源模型" : "系统配置"},
+    {key:"permissions",label:"权限",hint:"数字化库权限"},
   ]
   return <div className="digital-library-workspace">
     <aside className="digital-library-sidebar-v2">
-      <div className="digital-library-brand"><span className="digital-library-brand-icon"><Icon name="layers" size={17}/></span><div><b>数字化库中心</b><small>模型运行数据与标准数据</small></div><button onClick={loadLibraries} className="icon-button" title="刷新"><Icon name="arrow" size={14}/></button></div>
+      <div className="digital-library-brand"><span className="digital-library-brand-icon"><Icon name="layers" size={17}/></span><div><b>数字化库中心</b><small>模型运行数据与数字化数据</small></div><button onClick={loadLibraries} className="icon-button" title="刷新"><Icon name="arrow" size={14}/></button></div>
       <div className="digital-library-search-v2"><Icon name="search" size={15}/><input value={term} onChange={e=>setTerm(e.target.value)} placeholder="搜索数字化库"/></div>
-      <div className="digital-library-filter-tabs">
-        <button className={libraryFilter === "all" ? "active" : ""} onClick={()=>setLibraryFilter("all")}>全部 <em>{libraries.length}</em></button>
-        <button className={libraryFilter === "standard" ? "active" : ""} onClick={()=>setLibraryFilter("standard")}>标准库 <em>{standardCount}</em></button>
-        <button className={libraryFilter === "model" ? "active" : ""} onClick={()=>setLibraryFilter("model")}>模型库 <em>{modelCount}</em></button>
-      </div>
       <div className="digital-library-tree">
         {loadingLibraries ? <Empty text="正在读取数字化库…"/> : visibleLibraries.map(item => <button key={item.id} onClick={() => setSelectedId(item.id)} className={selectedId === item.id ? "active" : ""}>
-          <span className={`digital-library-tree-icon ${item.isStandard ? "standard" : "model"}`}><Icon name={item.isStandard ? "book" : "layers"} size={15}/></span>
-          <span className="digital-library-tree-text"><b>{item.name}</b><small>{item.isStandard ? "标准数据源" : item.modelName || "模型数字化库"}</small></span>
+          <span className="digital-library-tree-icon model"><Icon name="layers" size={15}/></span>
+          <span className="digital-library-tree-text"><b>{item.name}</b><small>{item.modelName || "数字化库"}</small></span>
           <span className="digital-library-tree-count">{item.recordCount}</span>
         </button>)}
         {!loadingLibraries && visibleLibraries.length === 0 && <Empty text="没有匹配的数字化库"/>}
@@ -650,15 +774,15 @@ function DigitalLibrary() {
     <section className="digital-library-content-v2">
       {!selected ? <Empty text="请选择一个数字化库"/> : <>
         <header className="digital-library-page-head">
-          <div className="digital-library-title-area"><div className="digital-library-breadcrumb">数字化库 / {selected.isStandard ? "标准库" : "模型库"}</div><div className="digital-library-title-row"><h2>{selected.name}</h2><span className={`library-type-pill ${selected.isStandard ? "standard" : "model"}`}>{selected.isStandard ? "标准库" : "模型库"}</span>{selected.allowAsSource && <span className="library-source-pill">可作为数据源</span>}</div><p>{selected.isStandard ? "由对应标准模型产生并维护标准数据，可被其他模型字段直接引用。记录列表仅保留文件名入口，全部数字化数据在详情中查看。" : `${selected.modelName || "业务模型"}每次归档形成一条数字化库文件记录。记录列表仅显示文件名，全部业务数据、数字化标识和运行技术信息统一进入“查看详情”。`}</p></div>
+          <div className="digital-library-title-area"><div className="digital-library-breadcrumb">数字化库</div><div className="digital-library-title-row"><h2>{selected.name}</h2>{selected.allowAsSource && <span className="library-source-pill">可作为数据源</span>}</div><p>{selected.modelName ? `${selected.modelName}运行形成并维护本数字化库。记录列表仅显示文件名，全部业务数据、数字化标识和运行技术信息统一进入“查看详情”。` : "本数字化库由对应模型运行形成并维护，可按权限被其他模型引用。记录列表仅显示文件名，全部数字化数据在详情中查看。"}</p></div>
           <div className="digital-library-kpi-group"><div><b>{selected.recordCount}</b><span>文件记录</span></div><div><b>{columns.length}</b><span>字段数量</span></div></div>
         </header>
 
         <div className="digital-library-overview-grid">
-          <div><span>来源模型</span><b>{selected.modelName || "系统标准模型"}</b></div>
+          <div><span>来源模型</span><b>{selected.modelName || "系统配置模型"}</b></div>
           <div><span>数据用途</span><b>{selected.allowAsSource ? "可被模型引用" : "仅本模型使用"}</b></div>
           <div><span>模型数字化编码</span><b className="font-mono">{selected.modelCode || "—"}</b></div>
-          <div><span>当前状态</span><b>{selected.projectStatus === "published" ? "已发布" : selected.projectStatus || "系统标准"}</b></div>
+          <div><span>当前状态</span><b>{selected.projectStatus === "published" ? "已发布" : selected.projectStatus || "系统配置"}</b></div>
         </div>
 
         <nav className="digital-library-tabs-v2">{tabItems.map(tab => <button key={tab.key} onClick={()=>setActiveTab(tab.key)} className={activeTab === tab.key ? "active" : ""}><b>{tab.label}</b><small>{tab.hint}</small></button>)}</nav>
@@ -673,18 +797,18 @@ function DigitalLibrary() {
         {activeTab === "fields" && <div className="digital-library-tab-panel">
           <div className="digital-library-section-head"><div><h3>字段设计</h3><p>字段中文名称面向业务人员；16 位数字化标识用于系统存储、跨模型引用和智选判断。</p></div><span className="section-badge">{columns.length} 个字段</span></div>
           <div className="digital-field-table"><div className="digital-field-row head"><span>字段名称</span><span>字段类型</span><span>必填</span><span>字段角色</span><span>数字化标识</span></div>{columns.map(col => <div className="digital-field-row" key={col.digitalId}><span><b>{col.displayName}</b><small>业务显示名称</small></span><span><em>{col.dataType || "text"}</em></span><span>{col.required ? <em className="yes">是</em> : <em>否</em>}</span><span>{col.sourceRole || "数据字段"}</span><span className="font-mono digital-id-cell">{col.digitalId}</span></div>)}</div>
-          <div className="digital-source-rule-card"><div className="digital-source-rule-icon"><Icon name="layers" size={18}/></div><div><b>选择类字段的数据源规则</b><p>下拉、人员、部门、多选等选择类字段应绑定到一个数字化库及其数字化标识列。多个字段可以复用同一个标准库，例如请休假、会议等模型中的人员选择统一引用“人员信息标准库”。具体来源在模型设计阶段配置，不再通过代码写死 options。</p></div></div>
+          <div className="digital-source-rule-card"><div className="digital-source-rule-icon"><Icon name="layers" size={18}/></div><div><b>选择类字段的数据源规则</b><p>下拉、人员、部门、多选等选择类字段应绑定到一个数字化库及其数字化标识列。多个字段可以复用同一个数字化库，例如请休假、会议等模型中的人员选择统一引用“人员信息数字化库”。具体来源在模型设计阶段配置，不再通过代码写死 options。</p></div></div>
         </div>}
 
         {activeTab === "relations" && <div className="digital-library-tab-panel">
-          <div className="digital-library-section-head"><div><h3>模型关联</h3><p>查看本库由哪个模型产生，以及作为标准数据源时可被哪些模型字段复用。</p></div></div>
-          <div className="digital-relation-grid"><div className="digital-relation-card primary"><span>数据产生模型</span><b>{selected.modelName || "系统标准模型"}</b><p>{selected.isStandard ? "标准模型运行后向本库写入或维护标准数据。" : "模型每次归档后向本数字化库写入一条运行记录。"}</p><small>{selected.modelCode || "未配置模型数字化编码"}</small></div><div className="digital-relation-arrow"><Icon name="arrow" size={20}/></div><div className="digital-relation-card"><span>数字化库</span><b>{selected.name}</b><p>{selected.allowAsSource ? "当前允许作为其他模型字段的数据源。" : "当前未开放给其他模型作为选择数据源。"}</p><small>{columns.length} 个数字化标识字段</small></div></div>
+          <div className="digital-library-section-head"><div><h3>模型关联</h3><p>查看本库由哪个模型产生，以及作为数字化数据源时可被哪些模型字段复用。</p></div></div>
+          <div className="digital-relation-grid"><div className="digital-relation-card primary"><span>数据产生模型</span><b>{selected.modelName || "系统配置模型"}</b><p>模型运行后向本数字化库写入或维护有效数据。</p><small>{selected.modelCode || "未配置模型数字化编码"}</small></div><div className="digital-relation-arrow"><Icon name="arrow" size={20}/></div><div className="digital-relation-card"><span>数字化库</span><b>{selected.name}</b><p>{selected.allowAsSource ? "当前允许作为其他模型字段的数据源。" : "当前未开放给其他模型作为选择数据源。"}</p><small>{columns.length} 个数字化标识字段</small></div></div>
           <div className="digital-relation-list"><h4>可引用字段</h4>{columns.map(col => <div key={col.digitalId}><span><b>{col.displayName}</b><small>{col.dataType}</small></span><span className="font-mono">{col.digitalId}</span><em>{selected.allowAsSource ? "可引用" : "仅内部"}</em></div>)}</div>
         </div>}
 
         {activeTab === "permissions" && <div className="digital-library-tab-panel">
           <div className="digital-library-section-head"><div><h3>数据权限</h3><p>当前权限规则与后台真实查询规则保持一致，避免前端展示与服务端数据范围不一致。</p></div></div>
-          <div className="digital-permission-grid"><div><span className="permission-icon"><Icon name="user" size={18}/></span><b>普通用户</b><p>{selected.isStandard ? "可读取系统标准记录，以及与本人业务授权相关的标准数据。" : "仅查看本人产生的模型运行记录；系统公共记录除外。"}</p></div><div><span className="permission-icon"><Icon name="shield" size={18}/></span><b>管理员</b><p>可查看本数字化库全部记录，用于标准数据维护、模型配置核验和系统管理。</p></div><div><span className="permission-icon"><Icon name="layers" size={18}/></span><b>模型引用</b><p>{selected.allowAsSource ? "已允许模型设计器把本库作为字段数据源。" : "当前不允许作为字段数据源，模型设计阶段不会列入可选数据源。"}</p></div></div>
+          <div className="digital-permission-grid"><div><span className="permission-icon"><Icon name="user" size={18}/></span><b>普通用户</b><p>按本人权限读取数字化库记录；本人业务记录与系统公共数据分别按权限范围控制。</p></div><div><span className="permission-icon"><Icon name="shield" size={18}/></span><b>管理员</b><p>可查看本数字化库全部记录，用于数字化数据维护、模型配置核验和系统管理。</p></div><div><span className="permission-icon"><Icon name="layers" size={18}/></span><b>模型引用</b><p>{selected.allowAsSource ? "已允许模型设计器把本库作为字段数据源。" : "当前不允许作为字段数据源，模型设计阶段不会列入可选数据源。"}</p></div></div>
         </div>}
       </>}
     </section>
@@ -709,21 +833,21 @@ function Feature({ title }: { title: string }) {
   const asset = title.includes("—") ? title.split("—").slice(-1)[0].replace("配置", "").replace("说明", "") : ""
   const configs: Record<string, { stage: string; summary: string; rows: string[][] }> = {
     模型目标: { stage: "建议阶段", summary: "确认请休假业务模型要解决的问题和边界。", rows: [["业务目标", "统一收集请休假申请、计算业务结果并形成可追溯归档"], ["适用范围", "全体在职人员，按员工身份与组织关系控制"], ["验收标准", "申请可提交、业务结果可计算、结果可归档并可触发独立审批模型"]] },
-    模型输入: { stage: "设计阶段", summary: "定义请休假业务模型启动时的交互数据。", rows: [["输入字段", "申请人、所属部门、请假类型、开始日期、结束日期、事由"], ["参数来源", "驾驶舱交互；申请人与部门从员工信息库读取"], ["校验规则", "日期有效、请假类型和请假事由必填"]] },
+    模型输入: { stage: "设计阶段", summary: "定义请休假业务模型启动时的交互数据。", rows: [["输入字段", "申请人、所属部门、请假类型、开始日期、结束日期、事由"], ["参数来源", "驾驶舱交互；申请人与部门从人员信息数字化库读取"], ["校验规则", "日期有效、请假类型和请假事由必填"]] },
     模型运算: { stage: "设计阶段", summary: "本业务模型只完成自身读取和业务运算，不计算审批路径。", rows: [["读取", "当前用户、所属部门"], ["计算", "请假天数 = 结束日期 - 开始日期 + 1"], ["边界", "审批路线、审批人员、审批结果均由独立审批模型计算和处理"]] },
-    模型输出: { stage: "设计阶段", summary: "明确请休假业务模型自身的输出数据。", rows: [["业务输出", "申请人、部门、请假类型、起止日期、事由、请假天数"], ["文件名", "5011001005001002-5011002000000001-时间码"], ["后续传递", "归档后把业务文件名、数字化标识、输入与输出传给独立审批模型"]] },
+    模型输出: { stage: "设计阶段", summary: "明确请休假业务模型自身的输出数据。", rows: [["业务输出", "申请人、部门、请假类型、起止日期、事由、请假天数"], ["文件名", "5011001005001000001-5011002000000001-时间码"], ["后续传递", "归档后把业务文件名、数字化标识、输入与输出传给独立审批模型"]] },
     模型存储: { stage: "设计阶段", summary: "请休假业务模型运行完成后只写入本模型数字化库。", rows: [["存储库", "请休假模型数字化库"], ["数字化标识", "5013001005001002"], ["实例区分", "数字化标识固定；每次运行通过模型文件名与 runId 区分"]] },
     普通场景: { stage: "测试阶段", summary: "验证常规请休假业务数据能够正确计算并归档。", rows: [["测试输入", "年休假，连续2天，事由完整"], ["预期计算", "请假天数 = 2"], ["预期结果", "形成请休假业务归档；归档关系可触发审批模型"]] },
     升级场景: { stage: "测试阶段", summary: "验证业务模型对较长请假仍只输出业务数据，不承载审批判断。", rows: [["测试输入", "年休假，连续4天，事由完整"], ["预期计算", "请假天数 = 4"], ["预期结果", "业务模型归档完成；审批路径由独立审批模型后续计算"]] },
     拦截场景: { stage: "测试阶段", summary: "验证业务输入无效时不产生业务归档，也不触发后续模型。", rows: [["测试输入", "结束日期早于开始日期，或事由为空"], ["预期动作", "页面提示并阻止提交"], ["校验结果", "不归档、不触发审批模型"]] },
     模型关联: { stage: "配置阶段", summary: "配置模型之间的归档后硬性链接；该关系不属于业务模型内部节点。", rows: [["当前模型", "请休假模型"], ["触发时点", "请休假模型完成归档后"], ["后续模型", "独立审批模型（接收业务文件名、数字化标识、输入和输出）"]] },
     审批规则: { stage: "独立审批模型", summary: "审批规则属于审批模型自身的四阶段设计，不属于请休假模型。", rows: [["模型对象", "审批模型"], ["审批步骤", "行政审批（申请人所属部门的部门经理） → 业务审批（考勤主管）"], ["数据来源", "前序请休假业务归档 + 用户角色 + 组织关系"]] },
-    数字化标识: { stage: "配置阶段", summary: "每个模型维护自己的固定数字化标识。", rows: [["请休假模型", "5013001005001002"], ["审批模型", "5013001005001001"], ["说明", "数字化标识固定为16位；运行实例由系统文件名与 runId 区分"]] },
+    数字化标识: { stage: "配置阶段", summary: "数字化标识必须由数字化标识建设模型正式分配。", rows: [["当前结构", "数字化标识使用0622规定的19位结构"], ["历史数据", "既有16位标识仅兼容读取，不作为新建口径"], ["运行区分", "每次模型运行通过模型文件名追溯，不设置模型ID"]] },
     发布状态: { stage: "配置阶段", summary: "完成闭环校验后发布模型，供用户人工启动。", rows: [["模型状态", "已启用"], ["可见入口", "可发起模型、模型建设工作台"], ["回退规则", "校验未通过时回到配置环节修改并重新测试"]] },
   }
   const config = configs[asset]
   if (!config) return <div className="empty-feature"><span><Icon name="layers" size={30}/></span><h3>{title}</h3><p>已进入{title}工作区。该入口已完成跳转，可继续接入对应业务功能。</p></div>
-  return <div className="feature-config"><div className="feature-config-head"><div><span className="status status-accent">请休假模型 · {config.stage}</span><h3>{asset}配置</h3><p>{config.summary}</p></div><span className="status success">已校验</span></div><div className="config-table">{config.rows.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div><div className="content-box mt-5">本配置遵循模型库标准的“交互、参数、运算、输出、存储”结构，前序输出将作为后序环节的输入。</div></div>
+  return <div className="feature-config"><div className="feature-config-head"><div><span className="status status-accent">请休假模型 · {config.stage}</span><h3>{asset}配置</h3><p>{config.summary}</p></div><span className="status success">已校验</span></div><div className="config-table">{config.rows.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div><div className="content-box mt-5">本配置遵循模型标准的“交互、参数、运算、输出、存储”结构，前序输出将作为后序环节的输入。</div></div>
 }
 function AdminConsole() {
   const [tab, setTab] = useState<"overview" | "users" | "registrations">("overview")
