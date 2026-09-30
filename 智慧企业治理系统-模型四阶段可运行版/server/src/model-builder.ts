@@ -826,14 +826,22 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
   }
   const businessContext=await sourceBusinessContext(input)
   const currentDesignSnapshot=businessContext.sourceProjectId ? await modelDesignLibrarySnapshot(businessContext.sourceProjectId) : null
-  const current0622=await resolveApprovalPlan0622({
-    sourceModelCode:businessContext.modelCode, sourceModelName:businessContext.modelName, sourceRunId:businessContext.sourceRunId, sourceProjectId:businessContext.sourceProjectId,
-    sourceFileName:businessContext.fileName, sourceDisplayFileName:businessContext.displayFileName, sourceDigitalId:businessContext.digitalId,
-    originatorId:String(input.originatorId ?? row.owner_id ?? ""), originatorName:String(input.originatorName ?? businessContext.businessData.applicant ?? ""),
-    businessFields:businessContext.businessFields as Array<Record<string,unknown>>, businessData:businessContext.businessData, identifierValues:businessContext.identifierValues,
-    modelDesignSource:currentDesignSnapshot ? "来源业务模型的模型设计模型数字化库" : "来源业务模型已发布设计配置", modelDesignIdentifierValues:currentDesignSnapshot?.identifierValues ?? {},
-  })
+  let current0622=null as Awaited<ReturnType<typeof resolveApprovalPlan0622>>
+  try {
+    current0622=await resolveApprovalPlan0622({
+      sourceModelCode:businessContext.modelCode, sourceModelName:businessContext.modelName, sourceRunId:businessContext.sourceRunId, sourceProjectId:businessContext.sourceProjectId,
+      sourceFileName:businessContext.fileName, sourceDisplayFileName:businessContext.displayFileName, sourceDigitalId:businessContext.digitalId,
+      originatorId:String(input.originatorId ?? row.owner_id ?? ""), originatorName:String(input.originatorName ?? businessContext.businessData.applicant ?? ""),
+      businessFields:businessContext.businessFields as Array<Record<string,unknown>>, businessData:businessContext.businessData, identifierValues:businessContext.identifierValues,
+      modelDesignSource:currentDesignSnapshot ? "来源业务模型的模型设计模型数字化库" : "来源业务模型已发布设计配置", modelDesignIdentifierValues:currentDesignSnapshot?.identifierValues ?? {},
+    })
+  } catch (error) {
+    const message=error instanceof Error ? error.message : "审批数字化配置计算失败"
+    if (["未匹配到模型数字化配置","未匹配到申请人员工数字化配置","未匹配到基础审批目标配置"].includes(message)) throw new ModelBuilderError(409,message)
+    throw error
+  }
   if (current0622) return current0622
+  if (businessContext.modelName === "请休假模型") throw new ModelBuilderError(409,"未匹配到基础审批目标配置")
   const candidates=[...new Set([...(await approvalBusinessCandidates(input)),businessContext.modelName].map(item=>String(item).trim()).filter(Boolean))]
   const identifierValues=Object.keys(businessContext.identifierValues).length ? businessContext.identifierValues : await sourceIdentifierValues(input)
   const [adminRows,businessRows,positionRows,opinionRows,assignmentRows,thresholdRows,personnelRows,departmentRows,organizationRankRows,timeoutRows,designSnapshot]=await Promise.all([
@@ -965,8 +973,8 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
   const pathCalculation = {
     "申请人":applicantName || "—",
     "申请人所在部门":startDepartment || "—",
-    "基础审批目标层级":baseAdministrativeTarget || "—",
-    "最终审批目标层级":administrativeLevel || baseAdministrativeTarget || "—",
+    "基础审批目标":baseAdministrativeTarget || "—",
+    "最终审批目标":administrativeLevel || baseAdministrativeTarget || "—",
     "基础技术业务审查目标层级":baseTechnicalTarget || "—",
     "最终技术业务审查目标层级":technicalLevel || baseTechnicalTarget || "—",
     "组织逐级路径":organizationPath,
@@ -1568,8 +1576,8 @@ export async function runPublishedModel(user: BuilderUser, modelName: string, in
       execution.output["正式审批路径节点"]=digitalPlan.approverCalculation
       execution.output["命中数字化标识阈值"]=digitalPlan.thresholdCalculation
       execution.output["正式审批路径"]=asArray<string>(digitalPlan.pathCalculation["正式审批路径"]).join(" → ") || digitalPlan.steps.map(item=>item.title).join(" → ")
-      execution.output["基础审批目标层级"]=digitalPlan.approvalComputationEvidence.baseAdministrativeTarget ?? ""
-      execution.output["最终审批目标层级"]=digitalPlan.administrativeLevel
+      execution.output["基础审批目标"]=digitalPlan.pathCalculation["基础审批目标"] ?? digitalPlan.approvalComputationEvidence.baseAdministrativeTarget ?? ""
+      execution.output["最终审批目标"]=digitalPlan.pathCalculation["最终审批目标"] ?? digitalPlan.administrativeLevel
       execution.output["技术业务审查目标层级"]=digitalPlan.technicalLevel
       execution.output["审批状态"]="待审批"
       execution.output.approvalStatus="待审批"
