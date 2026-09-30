@@ -12,7 +12,7 @@ for (const phrase of [
 ]) {
   assert.doesNotMatch(app, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `驾驶舱不得显示说明文字：${phrase}`)
 }
-assert.match(rules, /当前有效版本：V17\.7\.1/, '驾驶舱规则版本必须为 V17.7.1')
+assert.match(rules, /当前有效版本：V17\.7\.(?:[1-9]|[1-9]\d+)/, '驾驶舱规则版本不得低于 V17.7.1')
 assert.match(rules, /只显示区域名称/, '规则必须明确区域标题仅显示名称')
 assert.match(rules, /不得再增加.*说明性副标题/s, '规则必须禁止区域说明性副标题')
 

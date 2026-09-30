@@ -558,7 +558,7 @@ function completedRelatedRecord(parent: DoneRecord, raw: Record<string,unknown>,
     status,
     result:status === "已归档" ? "已办结" : status,
     record_kind:kind === "approval" ? "approval_run" : "launched",
-    content:JSON.stringify({ type:"model_run", runKind:kind, fileName, sourceModelName:String(raw.sourceModelName ?? (kind === "approval" ? parent.model : "审批模型")), status, input:object(raw.input), output:object(raw.output) }),
+    content:JSON.stringify({ type:"model_run", runKind:kind, runId:String(raw.runId ?? ""), fileName, displayFileName, digitalId:String(raw.digitalId ?? ""), sourceRunId:String(raw.sourceRunId ?? ""), sourceModelName:String(raw.sourceModelName ?? (kind === "approval" ? parent.model : "审批模型")), status, input:object(raw.input), output:object(raw.output) }),
   }
 }
 function CompletedTable({ items, onOpen }: { items: DoneRecord[]; onOpen:(x:DoneRecord)=>void }) {
@@ -570,7 +570,7 @@ function CompletedDetail({ item, onOpenModel }: { item?:DoneRecord; onOpenModel:
   const completed=parseCompletedModelContent(item)
   if (!completed) return <DoneDetail item={item}/>
   if (completed.runKind === "approval" || completed.runKind === "smart") {
-    return <DoneDetail item={{...item,record_kind:completed.runKind === "approval" ? "approval_run" : "launched",content:JSON.stringify({type:"model_run",runKind:completed.runKind,fileName:completed.fileName,sourceModelName:completed.sourceModelName,status:completed.status,input:completed.input,output:completed.output})}}/>
+    return <DoneDetail item={{...item,record_kind:completed.runKind === "approval" ? "approval_run" : "launched",content:JSON.stringify({type:"model_run",runKind:completed.runKind,runId:completed.runId,fileName:completed.fileName,displayFileName:completed.displayFileName,digitalId:completed.digitalId,sourceRunId:completed.sourceRunId,sourceModelName:completed.sourceModelName,status:completed.status,input:completed.input,output:completed.output})}}/>
   }
   const entries=businessEntries({...completed.input,...completed.output})
   const phase=completed.phase || "申请阶段"
@@ -584,9 +584,67 @@ function parseRunDoneContent(item: DoneRecord) {
     if (parsed.type !== "model_run") return null
     const input = parsed.input && typeof parsed.input === "object" && !Array.isArray(parsed.input) ? parsed.input as Record<string, unknown> : {}
     const output = parsed.output && typeof parsed.output === "object" && !Array.isArray(parsed.output) ? parsed.output as Record<string, unknown> : {}
-    return { input, output, fileName: String(parsed.fileName ?? ""), digitalId: String(parsed.digitalId ?? ""), sourceModelName: String(parsed.sourceModelName ?? input.sourceModelName ?? ""), runKind: String(parsed.runKind ?? (item.record_kind === "approval_run" ? "approval" : "manual")), status: String(parsed.status ?? item.result) }
+    return { input, output, runId:String(parsed.runId ?? ""), fileName: String(parsed.fileName ?? ""), displayFileName:String(parsed.displayFileName ?? ""), digitalId: String(parsed.digitalId ?? ""), sourceRunId:String(parsed.sourceRunId ?? ""), sourceModelName: String(parsed.sourceModelName ?? input.sourceModelName ?? ""), runKind: String(parsed.runKind ?? (item.record_kind === "approval_run" ? "approval" : "manual")), status: String(parsed.status ?? item.result) }
   } catch { return null }
 }
+type RunDetailView = { id:string; modelName:string; ownerName:string; fileName:string; displayFileName:string; digitalId:string; status:string; sourceRunId:string; triggerMode:string; input:Record<string,unknown>; output:Record<string,unknown>; createdAt:string|null; completedAt:string|null }
+type RunDigitalRecordView = { libraryName:string; digitalId:string; identifierValues:Record<string,unknown>; data:Record<string,unknown>; createdAt:string|null }
+type SmartRunDetailPayload = { run:RunDetailView; sourceApproval:RunDetailView|null; businessRun:RunDetailView|null; smartDigitalRecord:RunDigitalRecordView|null; businessDigitalRecord:RunDigitalRecordView|null }
+function SmartRunDetail({ item, snapshot }: { item:DoneRecord; snapshot:NonNullable<ReturnType<typeof parseRunDoneContent>> }) {
+  const [detail,setDetail]=useState<SmartRunDetailPayload|null>(null)
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState("")
+  const runId=snapshot.runId
+  useEffect(()=>{
+    let cancelled=false
+    if (!runId) { setDetail(null); setError("未找到本次智选模型运行记录"); setLoading(false); return ()=>{cancelled=true} }
+    setLoading(true); setError("")
+    apiFetch<{detail:SmartRunDetailPayload}>(`/api/model-runs/${encodeURIComponent(runId)}/detail`).then(result=>{ if (!cancelled) setDetail(result.detail) }).catch(()=>{ if (!cancelled) { setDetail(null); setError("未找到本次智选模型运行记录") } }).finally(()=>{ if (!cancelled) setLoading(false) })
+    return ()=>{cancelled=true}
+  },[runId])
+  const object=(value:unknown)=>value && typeof value === "object" && !Array.isArray(value) ? value as Record<string,unknown> : {}
+  const objectArray=(value:unknown)=>Array.isArray(value) ? value.filter((entry):entry is Record<string,unknown>=>Boolean(entry)&&typeof entry === "object"&&!Array.isArray(entry)) : []
+  const text=(value:unknown,fallback="—")=>value === undefined || value === null || String(value).trim() === "" ? fallback : String(value)
+  const listText=(value:unknown,separator="、",fallback="无")=>Array.isArray(value) ? (value.map(String).filter(Boolean).join(separator)||fallback) : text(value,fallback)
+  const timeText=(value:unknown)=>value ? String(value).slice(0,19).replace("T"," ") : "—"
+  if (loading) return <div><h3 className="detail-title !mt-0">{item.title || snapshot.displayFileName || snapshot.fileName || "智选模型"}</h3><div className="content-box">正在读取本次智选模型运行记录…</div></div>
+  if (!detail) return <div><h3 className="detail-title !mt-0">{item.title || snapshot.displayFileName || snapshot.fileName || "智选模型"}</h3><div className="meta-grid"><span>所属模型<b>智选模型</b></span><span>模型文件名<b className="font-mono text-xs">{snapshot.fileName || "—"}</b></span><span>来源模型<b>{snapshot.sourceModelName || "审批模型"}</b></span><span>运行标识<b className="font-mono text-xs">{runId || "—"}</b></span></div><h4 className="section-title">模型信息</h4><div className="content-box">{error || "未找到本次智选模型运行记录"}。历史字段缺失只影响对应字段展示，不影响返回已办/办结列表。</div></div>
+  const run=detail.run
+  const approval=detail.sourceApproval
+  const business=detail.businessRun
+  const output=object(run.output)
+  const input=object(run.input)
+  const smartDigital=object(detail.smartDigitalRecord?.data)
+  const businessDigital=object(detail.businessDigitalRecord?.data)
+  const businessDigitalInput=object(businessDigital.input)
+  const businessDigitalOutput=object(businessDigital.output)
+  const businessData=business ? {...object(business.input),...object(business.output)} : {...businessDigitalInput,...businessDigitalOutput,...businessDigital}
+  const businessContentEntries=businessEntries(businessData)
+  const approvalOutput=object(approval?.output)
+  const approvalResult=text(output["审批结果"] ?? output.approvalResult ?? approvalOutput["审批结果"] ?? approvalOutput.approvalResult ?? input.approvalResult,"—")
+  const sourceApprovalFile=text(approval?.fileName ?? input["前序模型文件名"] ?? input.sourceFileName,"—")
+  const businessModelName=text(business?.modelName ?? input["业务模型"] ?? input.businessSourceModelName,"—")
+  const businessFileName=text(business?.fileName ?? input["业务模型文件名"] ?? input.businessFileName,"—")
+  const statisticsState=text(output["统计分析状态"] ?? smartDigital["统计分析状态"],"未形成")
+  const statisticsFile=text(output["统计分析模型文件名"] ?? smartDigital["统计分析模型文件名"],"—")
+  const pendingRaw=output["待处理数字化标识集合"] ?? output.pendingDigitalIds ?? smartDigital["待处理数字化标识集合"]
+  const associatedRaw=output["有关联数字化标识集合"] ?? output.associatedDigitalIds ?? output.associatedDigitalId ?? output.relatedDigitalIds ?? smartDigital["有关联数字化标识集合"]
+  const specialResult=text(output["特殊判断结果"] ?? smartDigital["特殊判断结果"],"未形成")
+  const normalResult=text(output["正常关联判断结果"] ?? smartDigital["正常关联判断结果"],"未形成")
+  const triggeredRaw=output["关联模型集合"] ?? output.triggeredModels ?? output.relatedModels ?? smartDigital["关联模型集合"]
+  const triggerDetails=objectArray(output["关联模型启动明细"] ?? smartDigital["关联模型启动明细"])
+  const identifierCounts=objectArray(output["各数字化标识有效数据条数"] ?? smartDigital["各数字化标识有效数据条数"])
+  const triggerCount=text(output["关联模型启动次数"] ?? smartDigital["关联模型启动次数"] ?? triggerDetails.length,"0")
+  const decision=text(output["智选结果"] ?? output.smartDecision ?? output.decision ?? output.result ?? smartDigital["智选结果"] ?? smartDigital.smartDecision,"—")
+  return <div><h3 className="detail-title !mt-0">{run.displayFileName || run.fileName || item.title || "智选模型"}</h3>
+    <h4 className="section-title">模型信息</h4><div className="business-detail-grid"><div><span>所属模型</span><b>智选模型</b></div><div><span>模型状态</span><b>{text(run.status)}</b></div><div className="wide"><span>智选模型文件名</span><b className="font-mono text-xs">{text(run.fileName)}</b></div><div><span>完成/归档时间</span><b>{timeText(run.completedAt)}</b></div><div><span>来源审批模型</span><b>审批模型</b></div><div className="wide"><span>来源审批模型文件名</span><b className="font-mono text-xs">{sourceApprovalFile}</b></div></div>
+    <h4 className="section-title">业务内容</h4><div className="business-detail-grid"><div><span>原业务模型</span><b>{businessModelName}</b></div><div className="wide"><span>原业务模型文件名</span><b className="font-mono text-xs">{businessFileName}</b></div><div><span>原业务数字化标识</span><b className="font-mono text-xs">{text(business?.digitalId ?? input["业务数字化标识"] ?? input.businessDigitalId)}</b></div>{businessContentEntries.map(entry=><div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{businessContentEntries.length === 0 && <div className="wide business-empty">来源业务运行未保存可展示业务字段</div>}</div>
+    <h4 className="section-title">审批结果</h4><div className="business-detail-grid"><div><span>审批结果</span><b>{approvalResult}</b></div><div className="wide"><span>审批模型文件名</span><b className="font-mono text-xs">{sourceApprovalFile}</b></div></div>
+    <h4 className="section-title">统计分析</h4><div className="business-detail-grid"><div><span>统计分析状态</span><b>{statisticsState}</b></div><div className="wide"><span>统计分析模型文件名</span><b className="font-mono text-xs">{statisticsFile}</b></div></div>
+    <h4 className="section-title">智选判断</h4><div className="business-detail-grid"><div className="wide"><span>待处理数字化标识集合</span><b className="font-mono text-xs">{listText(pendingRaw)}</b></div><div className="wide"><span>有关联数字化标识集合</span><b className="font-mono text-xs">{listText(associatedRaw)}</b></div><div><span>特殊判断结果</span><b>{specialResult}</b></div><div><span>正常关联判断结果</span><b>{normalResult}</b></div>{identifierCounts.length > 0 && <div className="wide"><span>各数字化标识有效数据条数</span><b>{identifierCounts.map(row=>`${text(row["数字化标识"])}：${text(row["有效数据条数"],"0")}条`).join("；")}</b></div>}<div className="wide"><span>关联模型集合</span><b>{listText(triggeredRaw," → ")}</b></div><div><span>关联模型启动次数</span><b>{triggerCount}</b></div><div className="wide"><span>智选结果</span><b>{decision}</b></div></div>
+    <h4 className="section-title">关联模型启动明细</h4>{triggerDetails.length ? <div className="approval-record-list">{triggerDetails.map((detailRow,index)=><div className="approval-record-card" key={`智选触发-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{text(detailRow["目标模型"] ?? detailRow["关联模型"],"关联模型")}</b><em className="status">{text(detailRow["启动结果"] ?? detailRow["触发状态"],"已触发")}</em></div><div className="business-detail-grid"><div><span>来源数字化标识</span><b className="font-mono text-xs">{text(detailRow["来源数字化标识"])}</b></div><div><span>关联数字化标识</span><b className="font-mono text-xs">{text(detailRow["关联数字化标识"])}</b></div><div><span>数据序号</span><b>{text(detailRow["数据序号"])}</b></div><div><span>触发类型</span><b>{text(detailRow["关联类型"] ?? detailRow["触发类型"],"正常")}</b></div><div className="wide"><span>目标模型文件名</span><b className="font-mono text-xs">{text(detailRow["目标模型文件名"] ?? detailRow["模型文件名"])}</b></div></div></div>)}</div> : <div className="content-box">本次智选没有形成后续关联模型启动明细；这仍是一条完整、有效的智选模型运行记录。</div>}</div>
+}
+
 function DoneDetail({ item }: { item?: DoneRecord }) {
   if (!item) return <Empty text="未找到已办记录"/>
   const run = parseRunDoneContent(item)
@@ -621,31 +679,7 @@ function DoneDetail({ item }: { item?: DoneRecord }) {
       <h4 className="section-title">审批人计算</h4>{approverCalculation.length ? <div className="approval-record-list">{approverCalculation.map((calc,index)=><div className="approval-record-card" key={`审批人计算-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{String(calc["环节名称"] ?? `审批环节${index+1}`)}</b><em className="status">{String(calc["环节类型"] ?? "审批")}</em></div><div className="business-detail-grid"><div><span>审批人</span><b>{String(calc["审批人"] ?? "待匹配")}</b></div><div><span>审批组织</span><b>{String(calc["审批组织"] ?? "—")}</b></div><div><span>审批层级/岗位</span><b>{String(calc["审批层级岗位"] ?? "—")}</b></div><div><span>规定时限</span><b>{approvalTimeoutDisplay(calc["规定时限"])}</b></div></div></div>)}</div> : <div className="content-box">历史审批记录未保存独立的审批人计算快照；可从办理记录中的实际审批人追溯。</div>}
       <h4 className="section-title">审批办理记录</h4>{approvalProcess.length ? <div className="approval-record-list">{approvalProcess.map((step,index)=>{ const calc=approverCalculation[index] ?? {}; return <div className="approval-record-card" key={`${String(step.step ?? "审批")}-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{String(step.step ?? `审批步骤${index+1}`)}</b><em className={`status ${step.result === "不同意" || step.result === "退回修改" ? "danger" : "success"}`}>{String(step.result ?? "已办理")}</em></div><div className="business-detail-grid"><div><span>审批/审查人</span><b>{String(step.approver ?? calc["审批人"] ?? "—")}</b></div><div><span>耗时</span><b>{approvalElapsedDisplay(step.arrivedAt,step.handledAt)}</b></div><div><span>到达时间</span><b>{String(step.arrivedAt ?? "—").slice(0,19).replace("T"," ")}</b></div><div><span>办理时间</span><b>{String(step.handledAt ?? "—").slice(0,19).replace("T"," ")}</b></div></div></div>})}</div> : <div className="content-box">审批模型当前暂无已完成的办理记录；模型仍在运行时可查看当前审批人和正式审批路径。</div>}</div>
   }
-  if (run?.runKind === "smart") {
-    const pendingRaw = run.output["待处理数字化标识集合"] ?? run.output.associatedDigitalIds ?? run.output.associatedDigitalId ?? run.output.relatedDigitalIds
-    const pending = Array.isArray(pendingRaw) ? pendingRaw.map(String).filter(Boolean).join("、") : String(pendingRaw ?? "")
-    const associatedRaw = run.output["有关联数字化标识集合"] ?? run.output.associatedDigitalIds ?? run.output.associatedDigitalId ?? run.output.relatedDigitalIds
-    const associated = Array.isArray(associatedRaw) ? associatedRaw.map(String).filter(Boolean).join("、") : String(associatedRaw ?? "")
-    const triggeredRaw = run.output["关联模型集合"] ?? run.output.triggeredModels ?? run.output.relatedModels
-    const triggered = Array.isArray(triggeredRaw) ? triggeredRaw.map(String).filter(Boolean).join(" → ") : String(triggeredRaw ?? "")
-    const decision = String(run.output["智选结果"] ?? run.output.smartDecision ?? run.output.decision ?? run.output.result ?? item.result ?? "")
-    const approvalResult = String(run.output["审批结果"] ?? run.output.approvalResult ?? "—")
-    const sourceApprovalFile = String(run.input["前序模型文件名"] ?? run.input.sourceFileName ?? "—")
-    const businessModelName = String(run.input["业务模型"] ?? run.input.businessSourceModelName ?? "—")
-    const businessFileName = String(run.input["业务模型文件名"] ?? run.input.businessFileName ?? "—")
-    const statisticsState = String(run.output["统计分析状态"] ?? "—")
-    const statisticsFile = String(run.output["统计分析模型文件名"] ?? "—")
-    const specialResult = String(run.output["特殊判断结果"] ?? "—")
-    const normalResult = String(run.output["正常关联判断结果"] ?? "—")
-    const triggerCount = String(run.output["关联模型启动次数"] ?? (Array.isArray(run.output["关联模型启动明细"]) ? (run.output["关联模型启动明细"] as unknown[]).length : "0"))
-    const identifierCounts = objectArray(run.output["各数字化标识有效数据条数"])
-    const triggerDetails = objectArray(run.output["关联模型启动明细"])
-    return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>智选模型</b></span><span>来源模型<b>{run.sourceModelName || "审批模型"}</b></span><span>模型状态<b>{run.status || item.result}</b></span><span>智选结果<b className="text-[#27805f]">{decision || item.result}</b></span></div>
-      <h4 className="section-title">智选模型</h4><div className="business-detail-grid"><div className="wide"><span>智选模型文件名</span><b className="font-mono text-xs">{run.fileName || "—"}</b></div><div className="wide"><span>来源审批模型文件名</span><b className="font-mono text-xs">{sourceApprovalFile}</b></div><div><span>业务模型</span><b>{businessModelName}</b></div><div><span>业务模型文件名</span><b className="font-mono text-xs">{businessFileName}</b></div><div><span>审批结果</span><b>{approvalResult}</b></div><div><span>统计分析状态</span><b>{statisticsState}</b></div>{statisticsFile !== "—" && <div className="wide"><span>统计分析模型文件名</span><b className="font-mono text-xs">{statisticsFile}</b></div>}</div>
-      <h4 className="section-title">业务内容</h4><div className="business-detail-grid">{runEntries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{runEntries.length === 0 && <div className="business-empty">暂无可展示的业务字段</div>}</div>
-      <h4 className="section-title">智选判断</h4><div className="business-detail-grid"><div className="wide"><span>待处理数字化标识集合</span><b className="font-mono text-xs">{pending || "无"}</b></div><div className="wide"><span>有关联数字化标识集合</span><b className="font-mono text-xs">{associated || "无"}</b></div><div><span>特殊判断结果</span><b>{specialResult}</b></div><div><span>正常关联判断结果</span><b>{normalResult}</b></div>{identifierCounts.length > 0 && <div className="wide"><span>各数字化标识有效数据条数</span><b>{identifierCounts.map(row=>`${String(row["数字化标识"] ?? "—")}：${String(row["有效数据条数"] ?? "0")}条${row["存在关联配置"] === undefined ? "" : row["存在关联配置"] ? "（有关联）" : "（无关联）"}`).join("；")}</b></div>}<div className="wide"><span>关联模型集合</span><b>{triggered || "无"}</b></div><div><span>关联模型启动次数</span><b>{triggerCount}</b></div><div className="wide"><span>智选结果</span><b>{decision || "—"}</b></div></div>
-      <h4 className="section-title">关联模型启动明细</h4>{triggerDetails.length ? <div className="approval-record-list">{triggerDetails.map((detail,index)=><div className="approval-record-card" key={`智选触发-${index}`}><div className="approval-record-title"><span>{index+1}</span><b>{String(detail["目标模型"] ?? detail["关联模型"] ?? "关联模型")}</b><em className="status">{String(detail["关联类型"] ?? detail["触发类型"] ?? (detail["特殊关联"] ? "特殊" : "正常"))}</em></div><div className="business-detail-grid"><div><span>来源数字化标识</span><b className="font-mono text-xs">{String(detail["来源数字化标识"] ?? "—")}</b></div><div><span>关联数字化标识</span><b className="font-mono text-xs">{String(detail["关联数字化标识"] ?? "—")}</b></div><div><span>数据序号</span><b>{String(detail["数据序号"] ?? "—")}</b></div><div className="wide"><span>关联数据</span><b>{businessValue("关联数据", detail["关联数据"] ?? detail["来源数据"] ?? "—")}</b></div></div></div>)}</div> : <div className="content-box">本次没有可执行的标识关联配置，因此没有触发后续模型。</div>}</div>
-  }
+  if (run?.runKind === "smart") return <SmartRunDetail item={item} snapshot={run}/>
   return <div><h3 className="detail-title !mt-0">{item.title}</h3><div className="meta-grid"><span>所属模型<b>{item.model}</b></span><span>{run ? "发起人" : "办理人"}<b>{item.sender}</b></span><span>{run ? "完成时间" : "处理时间"}<b>{item.handled}</b></span><span>{run ? "运行状态" : "处理结果"}<b className="text-[#27805f]">{item.result}</b></span></div>{run ? <><h4 className="section-title">业务内容</h4><div className="business-detail-grid">{runEntries.map(entry => <div key={entry.key} className={entry.key === "reason" || entry.key === "approvalContent" ? "wide" : ""}><span>{entry.label}</span><b>{entry.value}</b></div>)}{runEntries.length === 0 && <div className="business-empty">本次模型已完成并归档</div>}</div></> : <><h4 className="section-title">处理记录</h4><div className="content-box">本事项已完成处理，当前页面仅供查看，不再提供办理操作。</div></>}</div>
 }
 function libraryValue(value: unknown) {

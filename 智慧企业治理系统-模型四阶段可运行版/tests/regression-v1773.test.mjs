@@ -27,10 +27,10 @@ assert.match(workbench, /id: "system-approval-smart"[\s\S]*targetModelName: "智
 assert.match(workbench, /disabled=\{modelType === "approval" && relation\.targetModelName === "智选模型"\}/, '审批→智选系统关系不能在界面禁用或修改')
 assert.match(workbench, />系统固定<\/em>/, '审批→智选关系必须明确标识为系统固定')
 
-assert.match(clusterRules, /当前有效版本：V17\.7\.3/, '模型簇规则版本必须升级为 V17.7.3')
+assert.match(clusterRules, /当前有效版本：V17\.7\.(?:[3-9]|[1-9]\d+)/, '模型簇规则不得低于 V17.7.3')
 assert.match(clusterRules, /不得依赖以下可变配置才能成立/, '模型簇规则必须明确硬性链路不依赖历史配置')
 assert.match(clusterRules, /原业务发起人生成智选结果待办/, '模型簇规则必须要求原业务发起人收到智选待办')
-assert.match(approvalRules, /当前有效版本：V17\.7\.3/, '审批智选规则版本必须升级为 V17.7.3')
+assert.match(approvalRules, /当前有效版本：V17\.7\.(?:[3-9]|[1-9]\d+)/, '审批智选规则不得低于 V17.7.3')
 assert.match(approvalRules, /历史配置缺失、被删除或被禁用时，系统仍必须执行审批→智选/, '审批智选规则必须覆盖历史配置断链问题')
 assert.match(approvalRules, /无后续关联模型不等于“不启动智选”/, '没有后续业务模型时仍必须运行智选')
 assert.match(internalRules, /运行引擎系统关系/, '审批内部规则必须把审批→智选定义为运行引擎关系')

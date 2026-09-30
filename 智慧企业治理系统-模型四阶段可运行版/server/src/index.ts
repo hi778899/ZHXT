@@ -352,6 +352,38 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       }
       return sendJson(res, req, 200, { user: userView(user), todos: todos.rows, done: done.rows, completed: completed.rows, metrics: metrics })
     }
+    const modelRunDetailMatch = url.pathname.match(/^\/api\/model-runs\/([^/]+)\/detail$/)
+    if (req.method === "GET" && modelRunDetailMatch) {
+      const runId = decodeURIComponent(modelRunDetailMatch[1])
+      const runResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.trigger_mode,r.source_run_id,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name,u.display_name AS owner_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id JOIN users u ON u.id=r.owner_id
+        WHERE r.id=$1 AND m.name='智选模型'
+          AND ($3='admin' OR r.owner_id=$2 OR EXISTS(SELECT 1 FROM todos t WHERE t.run_id=r.id AND t.owner_id=$2))
+        LIMIT 1`, [runId,user.id,user.role])
+      if (!runResult.rowCount) return sendJson(res, req, 404, { error: "smart_run_not_found" })
+      const smart = runResult.rows[0]
+      const smartInput = smart.input_data && typeof smart.input_data === "object" && !Array.isArray(smart.input_data) ? smart.input_data as Record<string,unknown> : {}
+      const sourceRunId = String(smart.source_run_id ?? smartInput.sourceRunId ?? "")
+      const sourceFileName = String(smartInput["前序模型文件名"] ?? smartInput.sourceFileName ?? "")
+      const approvalResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.source_run_id,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id
+        WHERE m.name='审批模型' AND (($1<>'' AND r.id=$1) OR ($2<>'' AND r.file_name=$2))
+        ORDER BY CASE WHEN r.id=$1 THEN 0 ELSE 1 END,r.created_at DESC LIMIT 1`, [sourceRunId,sourceFileName])
+      const approval = approvalResult.rows[0] ?? null
+      const approvalInput = approval?.input_data && typeof approval.input_data === "object" && !Array.isArray(approval.input_data) ? approval.input_data as Record<string,unknown> : {}
+      const businessRunId = String(smartInput.businessRunId ?? smartInput["业务模型运行ID"] ?? approval?.source_run_id ?? approvalInput.sourceRunId ?? "")
+      const businessFileName = String(smartInput["业务模型文件名"] ?? smartInput.businessFileName ?? approvalInput["前序模型文件名"] ?? approvalInput.sourceFileName ?? "")
+      const businessResult = await query<any>(`SELECT r.id,r.file_name,r.display_file_name,r.digital_id,r.status,r.input_data,r.output_data,r.created_at,r.completed_at,m.name AS model_name,u.display_name AS owner_name
+        FROM model_runs r JOIN models m ON m.id=r.model_id JOIN users u ON u.id=r.owner_id
+        WHERE m.name NOT IN ('审批模型','智选模型') AND (($1<>'' AND r.id=$1) OR ($2<>'' AND r.file_name=$2))
+        ORDER BY CASE WHEN r.id=$1 THEN 0 ELSE 1 END,r.created_at DESC LIMIT 1`, [businessRunId,businessFileName])
+      const business = businessResult.rows[0] ?? null
+      const smartLibraryResult = await query<any>(`SELECT library_name,digital_id,identifier_values,data,created_at FROM digital_library_records WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1`, [smart.id])
+      const businessLibraryResult = business?.id ? await query<any>(`SELECT library_name,digital_id,identifier_values,data,created_at FROM digital_library_records WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1`, [business.id]) : { rows: [] as any[] }
+      const normalizeRun = (row:any) => row ? ({ id:String(row.id ?? ""), modelName:String(row.model_name ?? ""), ownerName:String(row.owner_name ?? ""), fileName:String(row.file_name ?? ""), displayFileName:String(row.display_file_name ?? ""), digitalId:String(row.digital_id ?? ""), status:String(row.status ?? ""), sourceRunId:String(row.source_run_id ?? ""), triggerMode:String(row.trigger_mode ?? ""), input:row.input_data && typeof row.input_data === "object" ? row.input_data : {}, output:row.output_data && typeof row.output_data === "object" ? row.output_data : {}, createdAt:row.created_at ?? null, completedAt:row.completed_at ?? null }) : null
+      const normalizeLibrary = (row:any) => row ? ({ libraryName:String(row.library_name ?? ""), digitalId:String(row.digital_id ?? ""), identifierValues:row.identifier_values && typeof row.identifier_values === "object" ? row.identifier_values : {}, data:row.data && typeof row.data === "object" ? row.data : {}, createdAt:row.created_at ?? null }) : null
+      return sendJson(res, req, 200, { detail: { run:normalizeRun(smart), sourceApproval:normalizeRun(approval), businessRun:normalizeRun(business), smartDigitalRecord:normalizeLibrary(smartLibraryResult.rows[0] ?? null), businessDigitalRecord:normalizeLibrary(businessLibraryResult.rows[0] ?? null) } })
+    }
     if (req.method === "GET" && url.pathname === "/api/models") {
       const models = await query(`SELECT m.id,m.name,m.category,m.description,m.can_start
         FROM models m
