@@ -1,8 +1,0 @@
-V17.1.2.1 静态检查结果
-日期：2026-09-12
-
-1. 已修复 server/src/data-linkage.ts 中 design 由 Map.get() 推断为可选值导致的 TS2345 / TS18048。
-2. 使用 TypeScript 5.8.3，针对 data-linkage.ts 注入最小依赖类型桩后执行 strict 模式完整文件类型检查：通过，无错误。
-3. V17.1.2 的 015_backfill_legacy_digital_library_values.sql 保留不变。
-4. 014_model_backed_standard_libraries.sql 的 name/description 歧义修复保留不变。
-5. 未修改四阶段模型、审批模型、智选模型及数据库核心结构。
