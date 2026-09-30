@@ -179,25 +179,25 @@ function Dashboard({ todos, done, completed, metrics, openTodo, navigate }: { to
   return <main className="dashboard-home dashboard-workbench p-4 md:p-6">
     <section className="dashboard-welcome"><div><span className="status status-accent">个人工作台</span><h2>工作台</h2><p>集中处理个人事项、发起业务、查看工作进展，并快速进入常用功能。</p></div><button onClick={() => navigate("models")} className="btn-primary"><Icon name="plus" size={16}/>发起业务</button></section>
 
-    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>快捷入口</h3><p>常用业务功能快速进入，减少多层菜单查找。</p></div></div><div className="dashboard-rule-grid interaction-grid">
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>快捷入口</h3></div></div><div className="dashboard-rule-grid interaction-grid">
       <button className="dashboard-rule-card" onClick={() => navigate("models")}><span className="dashboard-rule-icon"><Icon name="layers" size={20}/></span><div><small>业务办理</small><b>发起业务</b><p>进入本人有权使用的已发布模型</p></div><Icon name="chevron" size={16}/></button>
       <button className="dashboard-rule-card" onClick={() => navigate("construction")}><span className="dashboard-rule-icon"><Icon name="gear" size={20}/></span><div><small>系统配置</small><b>模型建设</b><p>业务定义 → 数字化定义 → 模型设计 → 模型发布</p></div><Icon name="chevron" size={16}/></button>
     </div></section>
 
-    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>我的事项</h3><p>统一查看当前待处理、已处理以及已经办结的个人事项。</p></div></div><div className="dashboard-feedback-grid">
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>我的事项</h3></div></div><div className="dashboard-feedback-grid">
       <button onClick={() => navigate("todo")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="clock" size={19}/></span><small>当前需要本人处理</small><b>我的待办</b><strong>{todos.length}</strong></button>
       <button onClick={() => navigate("done")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="check" size={19}/></span><small>本人已经处理的任务/环节</small><b>我的已办</b><strong>{done.length}</strong></button>
       <button onClick={() => navigate("completed")} className="feedback-card"><span className="dashboard-rule-icon"><Icon name="file" size={19}/></span><small>已经完成归档的模型记录</small><b>我的办结</b><strong>{completed.length}</strong></button>
     </div><div className="dashboard-feedback-list"><div className="compact-panel-head"><div><b>待办事项</b><span>优先展示最近到达的个人待办</span></div><button onClick={() => navigate("todo")} className="link">查看全部 →</button></div><div className="dashboard-task-list">{todos.slice(0,4).map(item => <button key={item.id} onClick={() => openTodo(item)}><span><b>{item.title}</b><small>{item.model} · {item.date}</small></span><Icon name="chevron" size={15}/></button>)}{todos.length === 0 && <Empty text="当前没有待办事项" />}</div></div></section>
 
-    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>工作概览</h3><p>展示本人当日工作统计，数据来源于真实模型运行、数字化库和办理记录。</p></div></div><div className="dashboard-constraint-grid">
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>工作概览</h3></div></div><div className="dashboard-constraint-grid">
       <div className="constraint-card"><small>今日办结</small><b>{metrics.todayCompleted}</b><span>已完成归档的模型记录</span></div>
       <div className="constraint-card"><small>今日工作记录</small><b>{metrics.todayWorkRecords}</b><span>本人数字化库有效入库记录</span></div>
       <div className="constraint-card"><small>今日已办理</small><b>{metrics.todayHandled}</b><span>本人完成的办理动作</span></div>
       <div className="constraint-card"><small>{metrics.rankLabel}</small><b>{metrics.rank > 0 ? `第 ${metrics.rank} 名` : "暂无"}</b><span>{metrics.activeUsers > 0 ? `今日参与统计 ${metrics.activeUsers} 人` : "今日暂无可排名记录"}</span></div>
     </div></section>
 
-    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>常用服务</h3><p>进入与本人权限匹配的常用数据和信息服务。</p></div></div><div className="dashboard-resource-row"><button onClick={() => navigate("query")}>数字化库</button><button onClick={() => navigate("information")}>公共信息</button><button onClick={() => navigate("models")}>可发起模型</button></div></section>
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>常用服务</h3></div></div><div className="dashboard-resource-row"><button onClick={() => navigate("query")}>数字化库</button><button onClick={() => navigate("information")}>公共信息</button><button onClick={() => navigate("models")}>可发起模型</button></div></section>
   </main>
 }
 function LegacyDashboard({ todos, notices: dashboardNotices, openTodo, navigate, openFeature, setSelectedNotice }: { todos: typeof initialTodos; notices: string[][]; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void; openFeature: (x: string) => void; setSelectedNotice: (x: string[]) => void }) {

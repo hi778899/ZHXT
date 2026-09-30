@@ -18,13 +18,14 @@
     "db:seed": "node server/dist/seed.js",
     "build:all": "vite build && tsc -p server/tsconfig.json",
     "test:done-cluster": "node tests/done-cluster-ui.test.mjs",
-    "test:contracts": "node tests/approval-internal-logic.test.mjs && node tests/dashboard-feedback.test.mjs && node tests/done-cluster-ui.test.mjs && node tests/regression-v1731.test.mjs && node tests/regression-v174.test.mjs && node tests/regression-v1741.test.mjs && node tests/regression-v175.test.mjs && node tests/regression-v176.test.mjs && node tests/regression-v1761.test.mjs && node tests/regression-v177.test.mjs",
+    "test:contracts": "node tests/approval-internal-logic.test.mjs && node tests/dashboard-feedback.test.mjs && node tests/done-cluster-ui.test.mjs && node tests/regression-v1731.test.mjs && node tests/regression-v174.test.mjs && node tests/regression-v1741.test.mjs && node tests/regression-v175.test.mjs && node tests/regression-v176.test.mjs && node tests/regression-v1761.test.mjs && node tests/regression-v177.test.mjs && node tests/regression-v1771.test.mjs",
     "test:v174": "node tests/regression-v174.test.mjs",
     "test:v1741": "node tests/regression-v1741.test.mjs",
     "test:v175": "node tests/regression-v175.test.mjs",
     "test:v176": "node tests/regression-v176.test.mjs",
     "test:v1761": "node tests/regression-v1761.test.mjs",
-    "test:v177": "node tests/regression-v177.test.mjs"
+    "test:v177": "node tests/regression-v177.test.mjs",
+    "test:v1771": "node tests/regression-v1771.test.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1",
