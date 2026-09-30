@@ -12,6 +12,7 @@ type ModelField = { id: string; label: string; key: string; type: ModelFieldType
 type ModelDefinition = { kind: "business" | "approval" | "smart" | "service"; code: string; fileName: string; fields: ModelField[]; formula: string; explanation: string; output: string; storage: string; chain: string[] }
 type DigitalLibraryColumn = { digitalId:string; displayName:string; fieldKey?:string; dataType:string; required:boolean; position:number; sourceRole:string }
 type DigitalLibrarySummary = { id:string; name:string; kind:"standard"|"model"; isStandard:boolean; allowAsSource:boolean; recordCount:number; columns:DigitalLibraryColumn[]; fields:string[]; modelName?:string; modelCode?:string; digitalId?:string; projectStatus?:string }
+type ModelLibraryModelSummary = { id:string; name:string; category:string; description:string; canStart:boolean; projectId:string; projectStatus:string; modelCode:string; digitalId:string; libraryId:string; libraryName:string; runCount:number }
 type DigitalLibraryRecord = { recordId:string; modelId:string; projectId:string; runId:string; ownerId:string; ownerName:string; ownerCode:string; libraryId:string; libraryName:string; modelName:string; modelCode:string; digitalId:string; fileName:string; displayFileName:string; status:string; createdAt:string; values:Record<string,unknown>; data:Record<string,unknown> }
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
@@ -70,7 +71,7 @@ function dedupeNoticeRows<T extends { title: string; type: string; date: string 
     return true
   })
 }
-const titles: Record<View, string> = { dashboard: "驾驶舱", models: "可发起模型", "model-detail": "发起模型", todo: "我的待办", "todo-detail": "事项办理", done: "我的已办", "done-detail": "已办详情", completed: "我的办结", "completed-detail": "模型详情", construction: "模型建设工作台", query: "数字化库", "query-result": "数字化库", information: "公共信息", "information-detail": "信息详情", settings: "个人设置", status: "系统运行状态", feature: "功能工作区", admin: "管理后台", login: "用户登录" }
+const titles: Record<View, string> = { dashboard: "驾驶舱", models: "可发起模型", "model-detail": "发起模型", todo: "我的待办", "todo-detail": "事项办理", done: "我的已办", "done-detail": "已办详情", completed: "我的办结", "completed-detail": "模型详情", construction: "模型建设工作台", query: "模型库", "query-result": "模型库", information: "公共信息", "information-detail": "信息详情", settings: "个人设置", status: "系统运行状态", feature: "功能工作区", admin: "管理后台", login: "用户登录" }
 
 export default function App() {
   const [view, setView] = useState<View>("login")
@@ -173,7 +174,7 @@ export default function App() {
 }
 
 function Header({ title, userName, onHome, onNotify, onSettings, onUser, onLogout, onAdmin }: { title: string; userName: string; onHome: () => void; onNotify: () => void; onSettings: () => void; onUser: () => void; onLogout: () => void; onAdmin?: () => void }) { return <header className="relative z-30 flex h-[62px] items-center bg-[#475aad] px-5 text-white md:px-8"><button onClick={onHome} className="flex items-center gap-3 rounded-lg p-1.5 hover:bg-white/10"><span className="grid size-8 place-items-center rounded-lg bg-white text-[#5062b1]"><Icon name="squares" size={18}/></span><span className="hidden font-semibold tracking-[.08em] sm:inline">公司标识</span></button><div className="mx-5 hidden h-6 w-px bg-white/25 md:block"/><h1 className="text-base font-semibold tracking-[.08em] md:text-lg">{title}</h1><div className="ml-auto flex items-center gap-1">{onAdmin && <button onClick={onAdmin} className="hidden rounded-lg px-3 py-2 text-sm text-white/90 hover:bg-white/10 md:block">管理后台</button>}<button aria-label="通知" onClick={onNotify} className="header-icon"><Icon name="bell"/></button><button aria-label="设置" onClick={onSettings} className="header-icon"><Icon name="gear"/></button><button onClick={onUser} className="ml-2 flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10"><span className="avatar small">{userName.slice(0, 1)}</span><span className="hidden text-left text-sm md:block"><b className="block font-medium">{userName}</b><small className="text-white/70">当前用户</small></span></button><button onClick={onLogout} className="ml-1 hidden rounded-lg px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white sm:block">退出</button></div></header> }
-function TopNav({ view, navigate, isAdmin }: { view: View; navigate: (v: View) => void; isAdmin?: boolean }) { const items: [string, View][] = [["驾驶舱", "dashboard"], ["数字化库", "query"], ["我的待办", "todo"], ["我的已办", "done"], ["我的办结", "completed"], ["模型建设", "construction"], ["公共信息", "information"], ...(isAdmin ? [["管理后台", "admin"] as [string, View]] : [])]; return <nav className="sticky top-0 z-20 flex h-11 overflow-x-auto bg-[#394b98] px-3 text-white md:px-6">{items.map(([label, target]) => <button key={label} onClick={() => navigate(target)} className={`relative min-w-[112px] px-4 text-sm transition ${view === target || (view === "todo-detail" && target === "todo") || (view === "done-detail" && target === "done") || (view === "completed-detail" && target === "completed") || (view === "information-detail" && target === "information") ? "bg-[#6578bd] font-semibold after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-[#78c7ff]" : "text-white/88 hover:bg-white/10"}`}>{label}</button>)}</nav> }
+function TopNav({ view, navigate, isAdmin }: { view: View; navigate: (v: View) => void; isAdmin?: boolean }) { const items: [string, View][] = [["驾驶舱", "dashboard"], ["模型库", "query"], ["我的待办", "todo"], ["我的已办", "done"], ["我的办结", "completed"], ["模型建设", "construction"], ["公共信息", "information"], ...(isAdmin ? [["管理后台", "admin"] as [string, View]] : [])]; return <nav className="sticky top-0 z-20 flex h-11 overflow-x-auto bg-[#394b98] px-3 text-white md:px-6">{items.map(([label, target]) => <button key={label} onClick={() => navigate(target)} className={`relative min-w-[112px] px-4 text-sm transition ${view === target || (view === "todo-detail" && target === "todo") || (view === "done-detail" && target === "done") || (view === "completed-detail" && target === "completed") || (view === "information-detail" && target === "information") ? "bg-[#6578bd] font-semibold after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-[#78c7ff]" : "text-white/88 hover:bg-white/10"}`}>{label}</button>)}</nav> }
 
 function Dashboard({ todos, done, completed, metrics, openTodo, navigate }: { todos: typeof initialTodos; done: DoneRecord[]; completed: DoneRecord[]; metrics: DashboardMetrics; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void }) {
   return <main className="dashboard-home dashboard-workbench p-4 md:p-6">
@@ -197,7 +198,7 @@ function Dashboard({ todos, done, completed, metrics, openTodo, navigate }: { to
       <div className="constraint-card"><small>{metrics.rankLabel}</small><b>{metrics.rank > 0 ? `第 ${metrics.rank} 名` : "暂无"}</b><span>{metrics.activeUsers > 0 ? `今日参与统计 ${metrics.activeUsers} 人` : "今日暂无可排名记录"}</span></div>
     </div></section>
 
-    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>常用服务</h3></div></div><div className="dashboard-resource-row"><button onClick={() => navigate("query")}>数字化库</button><button onClick={() => navigate("information")}>公共信息</button><button onClick={() => navigate("models")}>可发起模型</button></div></section>
+    <section className="dashboard-rule-section"><div className="dashboard-rule-heading"><div><h3>常用服务</h3></div></div><div className="dashboard-resource-row"><button onClick={() => navigate("query")}>模型库</button><button onClick={() => navigate("information")}>公共信息</button><button onClick={() => navigate("models")}>可发起模型</button></div></section>
   </main>
 }
 function LegacyDashboard({ todos, notices: dashboardNotices, openTodo, navigate, openFeature, setSelectedNotice }: { todos: typeof initialTodos; notices: string[][]; openTodo: (x: typeof initialTodos[number]) => void; navigate: (v: View) => void; openFeature: (x: string) => void; setSelectedNotice: (x: string[]) => void }) {
@@ -212,7 +213,7 @@ function LegacyDashboard({ todos, notices: dashboardNotices, openTodo, navigate,
       <Panel title="智慧空间"><div className="grid grid-cols-3 gap-2 p-3 sm:grid-cols-5">{[["模型引擎","layers"],["建设引擎","gear"],["组织权限","user"],["门户引擎","squares"],["内容引擎","file"],["授权手册","book"],["制度查询","search"],["移动引擎","bell"],["日志中心","file"],["系统安全","shield"]].map(([label, icon]) => <button key={label} onClick={() => openFeature(label)} className="feature-tile"><span><Icon name={icon as IconName} size={17}/></span>{label}</button>)}</div><div className="mx-3 mb-3 flex flex-wrap justify-between gap-2 rounded-lg bg-[#e1ebfa] px-6 py-2.5 text-xs"><button onClick={() => openFeature("全局设置")} className="hover:underline">全局设置：<b className="text-[#27805f]">正常</b></button><button onClick={() => navigate("status")} className="hover:underline">系统状态：<b className="text-[#27805f]">正常</b></button></div></Panel></section></main>
 }
 
-function DigitalLibraryMini({ onOpen }: { onOpen: () => void }) { return <Card title="数字化库"><div className="space-y-3"><p className="muted">查看各模型数字化库及已经确认入库的运行记录。</p><button onClick={onOpen} className="btn-secondary w-full"><Icon name="layers" size={15}/>进入数字化库</button></div></Card> }
+function DigitalLibraryMini({ onOpen }: { onOpen: () => void }) { return <Card title="模型库"><div className="space-y-3"><p className="muted">统一查看系统全部模型、全部数字化库及其运行记录。</p><button onClick={onOpen} className="btn-secondary w-full"><Icon name="layers" size={15}/>进入模型库</button></div></Card> }
 
 function Workspace({ title, onBack, onHome, children }: { title: string; onBack: () => void; onHome: () => void; children: React.ReactNode }) { return <main className="p-4 md:p-6"><div className="mx-auto max-w-[1460px]"><div className="mb-5 flex items-center gap-2 text-sm"><button onClick={onHome} className="breadcrumb"><Icon name="home" size={15}/>驾驶舱</button><Icon name="chevron" size={13}/><span className="font-medium">{title}</span></div><section className="workspace"><div className="workspace-head"><button onClick={onBack} className="back-button"><Icon name="back" size={18}/>返回</button><h2>{title}</h2></div><div className="p-5 md:p-7">{children}</div></section></div></main> }
 function Models({ onSelect }: { onSelect: (m: Model) => void }) {
@@ -710,80 +711,139 @@ function digitalRecordValue(record: DigitalLibraryRecord, column: DigitalLibrary
   return undefined
 }
 
-type DigitalLibraryTab = "records" | "fields" | "relations" | "permissions"
+type ModelLibraryScope = "models" | "libraries"
+type DigitalLibraryTab = "records" | "fields" | "permissions"
 
 function DigitalLibrary() {
+  const [scope, setScope] = useState<ModelLibraryScope>("models")
+  const [models, setModels] = useState<ModelLibraryModelSummary[]>([])
   const [libraries, setLibraries] = useState<DigitalLibrarySummary[]>([])
-  const [selectedId, setSelectedId] = useState("")
+  const [selectedModelId, setSelectedModelId] = useState("")
+  const [selectedLibraryId, setSelectedLibraryId] = useState("")
   const [records, setRecords] = useState<DigitalLibraryRecord[]>([])
-  const [loadingLibraries, setLoadingLibraries] = useState(true)
+  const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [loadingRecords, setLoadingRecords] = useState(false)
   const [term, setTerm] = useState("")
   const [recordTerm, setRecordTerm] = useState("")
   const [activeTab, setActiveTab] = useState<DigitalLibraryTab>("records")
   const [selectedRecord, setSelectedRecord] = useState<DigitalLibraryRecord | null>(null)
 
-  const loadLibraries = () => {
-    setLoadingLibraries(true)
-    apiFetch<{libraries:DigitalLibrarySummary[]}>("/api/digital-libraries").then(data => {
-      setLibraries(data.libraries)
-      setSelectedId(current => current || data.libraries.find(item => item.modelName === "请休假模型")?.id || data.libraries[0]?.id || "")
-    }).catch(() => setLibraries([])).finally(() => setLoadingLibraries(false))
+  const loadCatalog = () => {
+    setLoadingCatalog(true)
+    Promise.all([
+      apiFetch<{models:ModelLibraryModelSummary[]}>("/api/model-library/models"),
+      apiFetch<{libraries:DigitalLibrarySummary[]}>("/api/digital-libraries"),
+    ]).then(([modelData,libraryData]) => {
+      setModels(modelData.models)
+      setLibraries(libraryData.libraries)
+      setSelectedModelId(current => current || modelData.models.find(item => item.name === "请休假模型")?.id || modelData.models[0]?.id || "")
+      setSelectedLibraryId(current => current || libraryData.libraries.find(item => item.modelName === "请休假模型")?.id || libraryData.libraries[0]?.id || "")
+    }).catch(() => {
+      setModels([])
+      setLibraries([])
+    }).finally(() => setLoadingCatalog(false))
   }
-  useEffect(loadLibraries, [])
+  useEffect(loadCatalog, [])
+
+  const selectedModel = models.find(item => item.id === selectedModelId)
+  const selectedLibrary = libraries.find(item => item.id === selectedLibraryId)
+  const modelLibrary = selectedModel?.libraryId ? libraries.find(item => item.id === selectedModel.libraryId) : undefined
+  const activeLibrary = scope === "models" ? modelLibrary : selectedLibrary
+  const activeLibraryId = activeLibrary?.id ?? ""
+
   useEffect(() => {
     setActiveTab("records")
     setRecordTerm("")
-    if (!selectedId) { setRecords([]); return }
+    setSelectedRecord(null)
+    if (!activeLibraryId) { setRecords([]); return }
     setLoadingRecords(true)
-    const params = new URLSearchParams({ libraryId: selectedId, limit: "300" })
+    const params = new URLSearchParams({ libraryId: activeLibraryId, limit: "300" })
     apiFetch<{records:DigitalLibraryRecord[]}>(`/api/digital-library/records?${params.toString()}`).then(data => setRecords(data.records)).catch(() => setRecords([])).finally(() => setLoadingRecords(false))
-  }, [selectedId])
+  }, [activeLibraryId])
 
-  const selected = libraries.find(item => item.id === selectedId)
   const filterText = term.trim().toLowerCase()
+  const visibleModels = models.filter(item => `${item.name} ${item.category} ${item.description} ${item.modelCode} ${item.libraryName}`.toLowerCase().includes(filterText))
   const visibleLibraries = libraries.filter(item => `${item.name} ${item.modelName ?? ""} ${item.digitalId ?? ""} ${item.columns.map(c => `${c.displayName} ${c.digitalId}`).join(" ")}`.toLowerCase().includes(filterText))
-  const columns = selected?.columns ?? []
+  const columns = activeLibrary?.columns ?? []
   const filteredRecords = records.filter(record => {
     const search = recordTerm.trim().toLowerCase()
     if (!search) return true
     return [record.fileName, record.displayFileName].join(" ").toLowerCase().includes(search)
   })
-  const tabItems: {key:DigitalLibraryTab;label:string;hint:string}[] = [
-    {key:"records",label:"文件记录",hint:`${selected?.recordCount ?? 0} 个`},
+  const statusText = (status:string) => status === "published" ? "已发布" : status === "ready" ? "待发布" : status === "testing" ? "测试中" : status === "draft" ? "草稿" : status === "system" ? "系统内置" : status || "系统内置"
+  const libraryTabs: {key:DigitalLibraryTab;label:string;hint:string}[] = [
+    {key:"records",label:"文件记录",hint:`${activeLibrary?.recordCount ?? 0} 个`},
     {key:"fields",label:"字段设计",hint:`${columns.length} 个字段`},
-    {key:"relations",label:"模型关联",hint:selected?.modelName ? "1 个来源模型" : "系统配置"},
-    {key:"permissions",label:"权限",hint:"数字化库权限"},
+    {key:"permissions",label:"权限",hint:"库权限"},
   ]
+  const switchScope = (next:ModelLibraryScope) => {
+    setScope(next)
+    setTerm("")
+    setRecordTerm("")
+    setSelectedRecord(null)
+  }
+
   return <div className="digital-library-workspace">
     <aside className="digital-library-sidebar-v2">
-      <div className="digital-library-brand"><span className="digital-library-brand-icon"><Icon name="layers" size={17}/></span><div><b>数字化库中心</b><small>模型运行数据与数字化数据</small></div><button onClick={loadLibraries} className="icon-button" title="刷新"><Icon name="arrow" size={14}/></button></div>
-      <div className="digital-library-search-v2"><Icon name="search" size={15}/><input value={term} onChange={e=>setTerm(e.target.value)} placeholder="搜索数字化库"/></div>
+      <div className="digital-library-brand"><span className="digital-library-brand-icon"><Icon name="layers" size={17}/></span><div><b>模型库中心</b><small>全部模型与全部数字化库</small></div><button onClick={loadCatalog} className="icon-button" title="刷新"><Icon name="arrow" size={14}/></button></div>
+      <div className="model-library-scope">
+        <button className={scope === "models" ? "active" : ""} onClick={() => switchScope("models")}>全部模型 <span>{models.length}</span></button>
+        <button className={scope === "libraries" ? "active" : ""} onClick={() => switchScope("libraries")}>全部库 <span>{libraries.length}</span></button>
+      </div>
+      <div className="digital-library-search-v2"><Icon name="search" size={15}/><input value={term} onChange={e=>setTerm(e.target.value)} placeholder={scope === "models" ? "搜索模型" : "搜索库"}/></div>
       <div className="digital-library-tree">
-        {loadingLibraries ? <Empty text="正在读取数字化库…"/> : visibleLibraries.map(item => <button key={item.id} onClick={() => setSelectedId(item.id)} className={selectedId === item.id ? "active" : ""}>
-          <span className="digital-library-tree-icon model"><Icon name="layers" size={15}/></span>
-          <span className="digital-library-tree-text"><b>{item.name}</b><small>{item.modelName || "数字化库"}</small></span>
-          <span className="digital-library-tree-count">{item.recordCount}</span>
-        </button>)}
-        {!loadingLibraries && visibleLibraries.length === 0 && <Empty text="没有匹配的数字化库"/>}
+        {loadingCatalog ? <Empty text={scope === "models" ? "正在读取全部模型…" : "正在读取全部库…"}/> : scope === "models" ? <>
+          {visibleModels.map(item => <button key={item.id} onClick={() => setSelectedModelId(item.id)} className={selectedModelId === item.id ? "active" : ""}>
+            <span className="digital-library-tree-icon model"><Icon name="squares" size={15}/></span>
+            <span className="digital-library-tree-text"><b>{item.name}</b><small>{item.category || "模型"}</small></span>
+            <span className="digital-library-tree-count">{item.runCount}</span>
+          </button>)}
+          {visibleModels.length === 0 && <Empty text="没有匹配的模型"/>}
+        </> : <>
+          {visibleLibraries.map(item => <button key={item.id} onClick={() => setSelectedLibraryId(item.id)} className={selectedLibraryId === item.id ? "active" : ""}>
+            <span className={`digital-library-tree-icon ${item.isStandard ? "standard" : "model"}`}><Icon name="layers" size={15}/></span>
+            <span className="digital-library-tree-text"><b>{item.name}</b><small>{item.modelName || "数字化库"}</small></span>
+            <span className="digital-library-tree-count">{item.recordCount}</span>
+          </button>)}
+          {visibleLibraries.length === 0 && <Empty text="没有匹配的库"/>}
+        </>}
       </div>
     </aside>
 
     <section className="digital-library-content-v2">
-      {!selected ? <Empty text="请选择一个数字化库"/> : <>
+      {scope === "models" ? !selectedModel ? <Empty text="请选择一个模型"/> : <>
         <header className="digital-library-page-head">
-          <div className="digital-library-title-area"><div className="digital-library-breadcrumb">数字化库</div><div className="digital-library-title-row"><h2>{selected.name}</h2>{selected.allowAsSource && <span className="library-source-pill">可作为数据源</span>}</div><p>{selected.modelName ? `${selected.modelName}运行形成并维护本数字化库。记录列表仅显示文件名，全部业务数据、数字化标识和运行技术信息统一进入“查看详情”。` : "本数字化库由对应模型运行形成并维护，可按权限被其他模型引用。记录列表仅显示文件名，全部数字化数据在详情中查看。"}</p></div>
-          <div className="digital-library-kpi-group"><div><b>{selected.recordCount}</b><span>文件记录</span></div><div><b>{columns.length}</b><span>字段数量</span></div></div>
+          <div className="digital-library-title-area"><div className="digital-library-breadcrumb">模型</div><div className="digital-library-title-row"><h2>{selectedModel.name}</h2>{selectedModel.canStart && <span className="library-source-pill">可运行</span>}</div><p>{selectedModel.description || "系统模型。模型的正式运行结果写入其对应数字化库。"}</p></div>
+          <div className="digital-library-kpi-group"><div><b>{selectedModel.runCount}</b><span>运行记录</span></div><div><b>{modelLibrary ? 1 : 0}</b><span>对应库</span></div></div>
         </header>
-
         <div className="digital-library-overview-grid">
-          <div><span>来源模型</span><b>{selected.modelName || "系统配置模型"}</b></div>
-          <div><span>数据用途</span><b>{selected.allowAsSource ? "可被模型引用" : "仅本模型使用"}</b></div>
-          <div><span>模型数字化编码</span><b className="font-mono">{selected.modelCode || "—"}</b></div>
-          <div><span>当前状态</span><b>{selected.projectStatus === "published" ? "已发布" : selected.projectStatus || "系统配置"}</b></div>
+          <div><span>模型类别</span><b>{selectedModel.category || "—"}</b></div>
+          <div><span>模型数字化编码</span><b className="font-mono">{selectedModel.modelCode || "—"}</b></div>
+          <div><span>当前状态</span><b>{statusText(selectedModel.projectStatus)}</b></div>
+          <div><span>对应数字化库</span>{modelLibrary ? <button className="link model-library-inline-link" onClick={() => { setSelectedLibraryId(modelLibrary.id); switchScope("libraries") }}>{modelLibrary.name}</button> : <b>未形成</b>}</div>
+        </div>
+        <div className="digital-library-tab-panel model-library-model-panel">
+          <div className="digital-library-section-head"><div><h3>模型文件记录</h3><p>按“一模型一数字化库”读取本模型对应数字化库中的正式运行记录。</p></div><span className="section-badge">{filteredRecords.length} 个文件</span></div>
+          {modelLibrary ? <>
+            <div className="digital-library-toolbar"><div className="search-box digital-record-search"><Icon name="search" size={15}/><input value={recordTerm} onChange={e=>setRecordTerm(e.target.value)} placeholder="搜索文件名"/></div><div className="digital-library-toolbar-note">对应库：{modelLibrary.name}</div></div>
+            <div className="digital-library-table-card">
+              {loadingRecords ? <Empty text="正在读取模型文件记录…"/> : filteredRecords.length === 0 ? <Empty text={records.length ? "没有匹配的文件" : "该模型当前还没有正式运行记录"}/> : <div className="digital-library-table-scroll"><table className="digital-library-file-table"><thead><tr><th>文件名</th><th className="action-col">查看详情</th></tr></thead><tbody>{filteredRecords.map(record => { const fileName=record.fileName || "未形成标准模型文件名"; return <tr key={record.recordId}><td><b className="font-mono">{fileName}</b>{record.displayFileName && record.displayFileName !== fileName && <small>{record.displayFileName}</small>}</td><td className="action-col"><button onClick={() => setSelectedRecord(record)} className="table-action">查看详情</button></td></tr>})}</tbody></table></div>}
+            </div>
+          </> : <Empty text="该模型尚未形成对应数字化库"/>}
+        </div>
+      </> : !selectedLibrary ? <Empty text="请选择一个库"/> : <>
+        <header className="digital-library-page-head">
+          <div className="digital-library-title-area"><div className="digital-library-breadcrumb">数字化库</div><div className="digital-library-title-row"><h2>{selectedLibrary.name}</h2>{selectedLibrary.allowAsSource && <span className="library-source-pill">可作为数据源</span>}</div><p>{selectedLibrary.modelName ? `${selectedLibrary.modelName}运行形成并维护本数字化库。记录列表仅显示文件名，全部业务数据、数字化标识和运行技术信息统一进入“查看详情”。` : "本数字化库由对应模型运行形成并维护，可按权限被其他模型引用。"}</p></div>
+          <div className="digital-library-kpi-group"><div><b>{selectedLibrary.recordCount}</b><span>文件记录</span></div><div><b>{columns.length}</b><span>字段数量</span></div></div>
+        </header>
+        <div className="digital-library-overview-grid">
+          <div><span>来源模型</span><b>{selectedLibrary.modelName || "系统配置模型"}</b></div>
+          <div><span>数据用途</span><b>{selectedLibrary.allowAsSource ? "可被模型引用" : "仅本模型使用"}</b></div>
+          <div><span>模型数字化编码</span><b className="font-mono">{selectedLibrary.modelCode || "—"}</b></div>
+          <div><span>当前状态</span><b>{statusText(selectedLibrary.projectStatus || "system")}</b></div>
         </div>
 
-        <nav className="digital-library-tabs-v2">{tabItems.map(tab => <button key={tab.key} onClick={()=>setActiveTab(tab.key)} className={activeTab === tab.key ? "active" : ""}><b>{tab.label}</b><small>{tab.hint}</small></button>)}</nav>
+        <nav className="digital-library-tabs-v2">{libraryTabs.map(tab => <button key={tab.key} onClick={()=>setActiveTab(tab.key)} className={activeTab === tab.key ? "active" : ""}><b>{tab.label}</b><small>{tab.hint}</small></button>)}</nav>
 
         {activeTab === "records" && <div className="digital-library-tab-panel">
           <div className="digital-library-toolbar"><div className="search-box digital-record-search"><Icon name="search" size={15}/><input value={recordTerm} onChange={e=>setRecordTerm(e.target.value)} placeholder="搜索文件名"/></div><div className="digital-library-toolbar-note">共 {filteredRecords.length} 个文件 · 列表仅保留文件名和查看详情</div></div>
@@ -793,30 +853,24 @@ function DigitalLibrary() {
         </div>}
 
         {activeTab === "fields" && <div className="digital-library-tab-panel">
-          <div className="digital-library-section-head"><div><h3>字段设计</h3><p>字段中文名称面向业务人员；16 位数字化标识用于系统存储、跨模型引用和智选判断。</p></div><span className="section-badge">{columns.length} 个字段</span></div>
+          <div className="digital-library-section-head"><div><h3>字段设计</h3><p>字段中文名称面向业务人员；数字化标识用于系统存储、跨模型引用和智选判断。</p></div><span className="section-badge">{columns.length} 个字段</span></div>
           <div className="digital-field-table"><div className="digital-field-row head"><span>字段名称</span><span>字段类型</span><span>必填</span><span>字段角色</span><span>数字化标识</span></div>{columns.map(col => <div className="digital-field-row" key={col.digitalId}><span><b>{col.displayName}</b><small>业务显示名称</small></span><span><em>{col.dataType || "text"}</em></span><span>{col.required ? <em className="yes">是</em> : <em>否</em>}</span><span>{col.sourceRole || "数据字段"}</span><span className="font-mono digital-id-cell">{col.digitalId}</span></div>)}</div>
-          <div className="digital-source-rule-card"><div className="digital-source-rule-icon"><Icon name="layers" size={18}/></div><div><b>选择类字段的数据源规则</b><p>下拉、人员、部门、多选等选择类字段应绑定到一个数字化库及其数字化标识列。多个字段可以复用同一个数字化库，例如请休假、会议等模型中的人员选择统一引用“员工信息数字化库”。具体来源在模型设计阶段配置，不再通过代码写死 options。</p></div></div>
-        </div>}
-
-        {activeTab === "relations" && <div className="digital-library-tab-panel">
-          <div className="digital-library-section-head"><div><h3>模型关联</h3><p>查看本库由哪个模型产生，以及作为数字化数据源时可被哪些模型字段复用。</p></div></div>
-          <div className="digital-relation-grid"><div className="digital-relation-card primary"><span>数据产生模型</span><b>{selected.modelName || "系统配置模型"}</b><p>模型运行后向本数字化库写入或维护有效数据。</p><small>{selected.modelCode || "未配置模型数字化编码"}</small></div><div className="digital-relation-arrow"><Icon name="arrow" size={20}/></div><div className="digital-relation-card"><span>数字化库</span><b>{selected.name}</b><p>{selected.allowAsSource ? "当前允许作为其他模型字段的数据源。" : "当前未开放给其他模型作为选择数据源。"}</p><small>{columns.length} 个数字化标识字段</small></div></div>
-          <div className="digital-relation-list"><h4>可引用字段</h4>{columns.map(col => <div key={col.digitalId}><span><b>{col.displayName}</b><small>{col.dataType}</small></span><span className="font-mono">{col.digitalId}</span><em>{selected.allowAsSource ? "可引用" : "仅内部"}</em></div>)}</div>
+          <div className="digital-source-rule-card"><div className="digital-source-rule-icon"><Icon name="layers" size={18}/></div><div><b>选择类字段的数据源规则</b><p>下拉、人员、部门、多选等选择类字段应绑定到一个数字化库及其数字化标识列。具体来源在模型设计阶段配置，不在前端写死。</p></div></div>
         </div>}
 
         {activeTab === "permissions" && <div className="digital-library-tab-panel">
-          <div className="digital-library-section-head"><div><h3>数据权限</h3><p>当前权限规则与后台真实查询规则保持一致，避免前端展示与服务端数据范围不一致。</p></div></div>
-          <div className="digital-permission-grid"><div><span className="permission-icon"><Icon name="user" size={18}/></span><b>普通用户</b><p>按本人权限读取数字化库记录；本人业务记录与系统公共数据分别按权限范围控制。</p></div><div><span className="permission-icon"><Icon name="shield" size={18}/></span><b>管理员</b><p>可查看本数字化库全部记录，用于数字化数据维护、模型配置核验和系统管理。</p></div><div><span className="permission-icon"><Icon name="layers" size={18}/></span><b>模型引用</b><p>{selected.allowAsSource ? "已允许模型设计器把本库作为字段数据源。" : "当前不允许作为字段数据源，模型设计阶段不会列入可选数据源。"}</p></div></div>
+          <div className="digital-library-section-head"><div><h3>数据权限</h3><p>当前权限规则与后台真实查询规则保持一致。</p></div></div>
+          <div className="digital-permission-grid"><div><span className="permission-icon"><Icon name="user" size={18}/></span><b>普通用户</b><p>按本人权限读取数字化库记录；本人业务记录与系统公共数据分别按权限范围控制。</p></div><div><span className="permission-icon"><Icon name="shield" size={18}/></span><b>管理员</b><p>可查看本数字化库全部记录，用于数字化数据维护、模型配置核验和系统管理。</p></div><div><span className="permission-icon"><Icon name="layers" size={18}/></span><b>模型引用</b><p>{selectedLibrary.allowAsSource ? "已允许模型设计器把本库作为字段数据源。" : "当前不允许作为字段数据源。"}</p></div></div>
         </div>}
       </>}
     </section>
 
-    {selectedRecord && selected && <Modal title={`${selected.name} · 记录详情`} onClose={() => setSelectedRecord(null)}><div className="digital-record-modal-v2"><div className="record-detail-banner"><div><b className="font-mono">{selectedRecord.fileName || "未形成标准模型文件名"}</b><span>{selectedRecord.displayFileName || selectedRecord.createdAt}</span></div><em>{selectedRecord.status || "已入库"}</em></div><div className="digital-record-identifier-grid-v2">{columns.map(col => <div key={col.digitalId}><span><b>{col.displayName}</b><small className="font-mono">{col.digitalId}</small></span><strong>{libraryValue(digitalRecordValue(selectedRecord,col))}</strong></div>)}</div><details className="digital-record-tech"><summary>运行技术信息</summary><div className="digital-record-db-grid">{[["record_id", selectedRecord.recordId],["model_id", selectedRecord.modelId],["project_id",selectedRecord.projectId],["run_id",selectedRecord.runId],["library_id",selectedRecord.libraryId],["model_code",selectedRecord.modelCode]].map(([key,value]) => <div key={key}><span>{key}</span><b className="font-mono">{value || "—"}</b></div>)}</div></details></div></Modal>}
+    {selectedRecord && activeLibrary && <Modal title={`${activeLibrary.name} · 记录详情`} onClose={() => setSelectedRecord(null)}><div className="digital-record-modal-v2"><div className="record-detail-banner"><div><b className="font-mono">{selectedRecord.fileName || "未形成标准模型文件名"}</b><span>{selectedRecord.displayFileName || selectedRecord.createdAt}</span></div><em>{selectedRecord.status || "已入库"}</em></div><div className="digital-record-identifier-grid-v2">{columns.map(col => <div key={col.digitalId}><span><b>{col.displayName}</b><small className="font-mono">{col.digitalId}</small></span><strong>{libraryValue(digitalRecordValue(selectedRecord,col))}</strong></div>)}</div><details className="digital-record-tech"><summary>运行技术信息</summary><div className="digital-record-db-grid">{[["record_id", selectedRecord.recordId],["model_id", selectedRecord.modelId],["project_id",selectedRecord.projectId],["run_id",selectedRecord.runId],["library_id",selectedRecord.libraryId],["model_code",selectedRecord.modelCode]].map(([key,value]) => <div key={key}><span>{key}</span><b className="font-mono">{value || "—"}</b></div>)}</div></details></div></Modal>}
   </div>
 }
 
 function Information({ items, onOpen }: { items:string[][]; onOpen:(n:string[])=>void }) { return <div className="table-wrap"><div className="info-list table-head"><span>信息标题</span><span>信息类型</span><span>发布日期</span><span>操作</span></div>{items.map(n => <button key={n[0]} onClick={() => onOpen(n)} className="info-list table-row"><span>{n[0]}</span><span><em className="status">{n[1]}</em></span><span>{n[2]}</span><span className="link">查看详情</span></button>)}</div> }
-function InformationDetail({ notice, onAttachment }: { notice:string[]; onAttachment:()=>void }) { return <article className="article"><span className="status">{notice[1]}</span><h2>{notice[0]}</h2><p className="article-meta">发布部门：数字化工作组　发布时间：{notice[2]}</p><hr/><p>为进一步规范驾驶舱各区域的功能入口与操作关系，现对相关页面要素和交互逻辑进行调整。</p><p>本次调整重点完善新建、待办、已办、模型建设、数字化库、公共信息及智慧空间等功能入口。用户可通过驾驶舱首页直接进入对应工作页面，待办事项支持直接办理，处理完成后自动进入已办记录。</p><p>请各部门结合实际使用情况及时反馈问题，持续优化驾驶舱的操作体验。</p><div className="attachment"><Icon name="file"/>附件：驾驶舱要素调整说明.pdf <button onClick={onAttachment} className="link">查看</button></div></article> }
+function InformationDetail({ notice, onAttachment }: { notice:string[]; onAttachment:()=>void }) { return <article className="article"><span className="status">{notice[1]}</span><h2>{notice[0]}</h2><p className="article-meta">发布部门：数字化工作组　发布时间：{notice[2]}</p><hr/><p>为进一步规范驾驶舱各区域的功能入口与操作关系，现对相关页面要素和交互逻辑进行调整。</p><p>本次调整重点完善新建、待办、已办、模型建设、模型库、公共信息及智慧空间等功能入口。用户可通过驾驶舱首页直接进入对应工作页面，待办事项支持直接办理，处理完成后自动进入已办记录。</p><p>请各部门结合实际使用情况及时反馈问题，持续优化驾驶舱的操作体验。</p><div className="attachment"><Icon name="file"/>附件：驾驶舱要素调整说明.pdf <button onClick={onAttachment} className="link">查看</button></div></article> }
 function Settings({ onPasswordChange, onSave }: { onPasswordChange:(current:string,next:string)=>Promise<void>; onSave:()=>void }) {
   const [current, setCurrent] = useState(""); const [next, setNext] = useState(""); const [confirm, setConfirm] = useState(""); const [error, setError] = useState(""); const [show, setShow] = useState(false)
   const changePassword = async () => { const issue = passwordIssue(next); if (issue) return setError(issue); if (next !== confirm) return setError("两次输入的新密码不一致"); try { await onPasswordChange(current, next); setCurrent(""); setNext(""); setConfirm(""); setError("") } catch (error) { setError(error instanceof Error ? error.message : "密码修改失败") } }

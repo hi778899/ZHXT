@@ -50,7 +50,7 @@
 
 涉及模型、数字化库、审批、智选时，必须同时阅读 `.ai/rules/02_ONE_MODEL_ONE_LIBRARY_RULES.md` 至 `.ai/rules/08_RUNTIME_ENGINE_RULES.md`，以及 `.ai/rules/16_MODEL_DIGITAL_CODE_FILENAME_RULES.md`。
 
-涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`、`.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`、`.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md` 与 `.ai/rules/22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
+涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`、`.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`、`.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md` 与 `.ai/rules/22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`；涉及模型库入口、全部模型/全部库目录时，还必须阅读 `.ai/rules/25_MODEL_LIBRARY_UI_RULES.md`。
 
 ## 3. 不可违反的红线
 
@@ -116,3 +116,11 @@
 - 不得把会议模型映射到0622的环保(006)业务属性。
 - 全系统配置完整性扫描发现缺陷时，记录并隔离对应模型；不得让单个模型缺配置导致整个应用无法启动。
 - 发布/运行异常模型时仍必须严格阻断并提示具体缺失配置。
+
+
+## V17.7.25 模型库界面规则
+
+- 驾驶舱统一入口显示名使用“模型库”，但底层正式存储概念仍为“数字化库”。
+- 模型库只设置“全部模型 / 全部库”两个一级范围。
+- 禁止新增模型分类查看、库分类查看、模型库关联查看入口。
+- 全部模型必须直接读取系统模型目录，不得以数字化库列表反推。

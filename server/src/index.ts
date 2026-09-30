@@ -113,6 +113,38 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (req.method === "POST" && url.pathname.startsWith("/api/admin/users/") && url.pathname.endsWith("/role")) { const admin = await requireAdmin(req, res); if (!admin) return; const id=url.pathname.split("/")[4]; const body=await readJson(req); const role=String(body.role ?? "").trim(); const allowed=new Set(["user","department_manager","attendance_supervisor","admin"]); if(!allowed.has(role)) return badRequest(res,req,"无效的用户角色"); if(id===admin.id && role!=="admin") return badRequest(res,req,"不能取消当前管理员的管理员角色"); const result=await query("UPDATE users SET role=$1,updated_at=now() WHERE id=$2 RETURNING id",[role,id]); if(!result.rowCount) return sendJson(res,req,404,{error:"user_not_found"}); await ensureEmployeeApprovalDigitalConfig(id); await audit(req,admin.id,"user_role_changed","user",id,{role}); return sendJson(res,req,200,{ok:true,role}) }
     if (req.method === "GET" && url.pathname === "/api/admin/audit") { const admin = await requireAdmin(req, res); if (!admin) return; const result = await query("SELECT a.id,a.action,a.resource_type,a.resource_id,a.ip,a.created_at,u.username FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC LIMIT 200"); return sendJson(res, req, 200, { logs: result.rows }) }
     if (req.method === "GET" && url.pathname === "/api/digital-libraries") { return sendJson(res, req, 200, { libraries: await listDataLibraries(user.id, user.role === "admin") }) }
+    if (req.method === "GET" && url.pathname === "/api/model-library/models") {
+      const result = await query<any>(`
+        SELECT m.id,m.name,m.category,m.description,m.can_start,
+               COALESCE(p.id,'') AS project_id,
+               COALESCE(p.status,'system') AS project_status,
+               COALESCE(p.configuration->>'modelCode','') AS model_code,
+               COALESCE(p.configuration->'digitalIdentities'->>0,'') AS digital_id,
+               COALESCE(l.id,'') AS library_id,
+               COALESCE(l.name,'') AS library_name,
+               COALESCE(COUNT(r.id) FILTER (WHERE ($2::boolean OR r.owner_id=$1)),0)::int AS run_count
+        FROM models m
+        LEFT JOIN model_projects p ON p.model_id=m.id
+        LEFT JOIN digital_libraries l ON l.model_id=m.id AND l.status='active'
+        LEFT JOIN model_runs r ON r.model_id=m.id
+        GROUP BY m.id,m.name,m.category,m.description,m.can_start,p.id,p.status,p.configuration,l.id,l.name
+        ORDER BY m.category,m.name
+      `, [user.id, user.role === "admin"])
+      return sendJson(res, req, 200, { models: result.rows.map((row:any) => ({
+        id:String(row.id ?? ""),
+        name:String(row.name ?? ""),
+        category:String(row.category ?? ""),
+        description:String(row.description ?? ""),
+        canStart:Boolean(row.can_start),
+        projectId:String(row.project_id ?? ""),
+        projectStatus:String(row.project_status ?? "system"),
+        modelCode:String(row.model_code ?? ""),
+        digitalId:String(row.digital_id ?? ""),
+        libraryId:String(row.library_id ?? ""),
+        libraryName:String(row.library_name ?? ""),
+        runCount:Number(row.run_count ?? 0),
+      })) })
+    }
     if (req.method === "GET" && url.pathname === "/api/digital-identifiers") { return sendJson(res, req, 200, { identifiers: await listDigitalIdentifiers() }) }
     if (req.method === "GET" && url.pathname === "/api/digital-library/records") { const library=String(url.searchParams.get("libraryId") ?? url.searchParams.get("library") ?? "").trim(); const limit=Number(url.searchParams.get("limit") ?? 200); return sendJson(res, req, 200, { records: await listDataLibraryRecords(user.id, library, limit, user.role === "admin") }) }
     if (req.method === "GET" && url.pathname === "/api/digital-library/lookup") {
