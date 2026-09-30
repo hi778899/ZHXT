@@ -71,11 +71,52 @@ export type Runtime0622SmartPlan = {
   smartDecision: string
 }
 
-type RecordRow = { values: Record<string, unknown>; data: Record<string, unknown> }
+type RecordRow = {
+  values: Record<string, unknown>
+  data: Record<string, unknown>
+  runId?: string
+  recordOrigin?: string
+  createdAt?: string
+  producerModelName?: string
+  approvalResult?: string
+  approvedAt?: string
+}
 
 async function records(libraryId: string): Promise<RecordRow[]> {
   const result = await query<any>("SELECT identifier_values,data FROM digital_library_records WHERE library_id=$1 ORDER BY created_at,id", [libraryId])
   return result.rows.map((row:any)=>({values:plainObject(row.identifier_values),data:plainObject(row.data)}))
+}
+
+async function timeoutRecords(libraryId: string): Promise<RecordRow[]> {
+  const result = await query<any>(`SELECT d.identifier_values,d.data,d.run_id,d.record_origin,d.created_at,
+      COALESCE(m.name,'') AS producer_model_name,
+      COALESCE(ap.approval_result,'') AS approval_result,
+      ap.approved_at
+    FROM digital_library_records d
+    LEFT JOIN models m ON m.id=d.model_id
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(ar.output_data->>'审批结果',ar.output_data->>'approvalResult','') AS approval_result,
+             ar.completed_at AS approved_at
+      FROM model_runs ar
+      JOIN models am ON am.id=ar.model_id
+      WHERE ar.source_run_id=d.run_id
+        AND am.name='审批模型'
+        AND ar.status='已归档'
+      ORDER BY ar.completed_at DESC NULLS LAST,ar.created_at DESC,ar.id DESC
+      LIMIT 1
+    ) ap ON true
+    WHERE d.library_id=$1
+    ORDER BY d.created_at,d.id`, [libraryId])
+  return result.rows.map((row:any)=>({
+    values:plainObject(row.identifier_values),
+    data:plainObject(row.data),
+    runId:text(row.run_id),
+    recordOrigin:text(row.record_origin),
+    createdAt:row.created_at ? new Date(row.created_at).toISOString() : "",
+    producerModelName:text(row.producer_model_name),
+    approvalResult:text(row.approval_result),
+    approvedAt:row.approved_at ? new Date(row.approved_at).toISOString() : "",
+  }))
 }
 
 function text(value: unknown) { return String(value ?? "").trim() }
@@ -189,26 +230,61 @@ function finalDedup(steps:Runtime0622Step[]) {
   return result
 }
 
+function nestedDataValue(record:RecordRow,key:string) {
+  const direct=record.data[key]
+  if (direct !== undefined && direct !== null && text(direct)) return direct
+  const output=plainObject(record.data.output)
+  const input=plainObject(record.data.input)
+  const nested=output[key] ?? input[key]
+  return nested !== undefined && nested !== null && text(nested) ? nested : undefined
+}
+
+function approvedResult(value:string) {
+  const normalized=value.trim()
+  return ["同意","通过","审批通过","已通过","允许生效"].some(item=>normalized.includes(item))
+}
+
+function timeoutRecordEffective(row:RecordRow) {
+  // 系统初始化/同步形成的基线配置可直接生效；人工模型运行必须完成审批并同意后才可生效。
+  if (["system_initialization","system_sync"].includes(row.recordOrigin ?? "")) return true
+  if ((row.producerModelName ?? "") !== "模型时限模型") return true
+  return approvedResult(row.approvalResult ?? "")
+}
+
 function timeoutForBusiness(rows:RecordRow[], hierarchy:string[]) {
   const matches=rows.map(row=>{
-    const domains=list(row.data["业务领域集合"])
+    if (!timeoutRecordEffective(row)) return null
+    const domains=list(
+      row.values["5013001001110172"]
+      ?? nestedDataValue(row,"业务领域集合")
+      ?? nestedDataValue(row,"businessDomains")
+    )
     if (!businessMatches(domains,hierarchy)) return null
-    const value=dataText(row,"模型时限").trim()
+    const value=text(
+      row.values["5013001001110171"]
+      ?? nestedDataValue(row,"模型时限")
+      ?? nestedDataValue(row,"timeoutHours")
+    )
     if (!value) return null
-    // 0622没有单独的“优先级”字段：适用业务集合越窄，配置越具体、优先级越高。
-    // 同一优先级若仍出现多个不同值，则不擅自取最大/最小，返回“未配置”等待正式配置收敛。
+    // 优先级：业务范围越具体越优先；同等精度下，人工审批生效配置优先于系统基线；
+    // 同类配置再次修改时，以最新审批生效时间为当前有效值。
     const matchedDepth=Math.max(0,...domains.map(domain=>{
       const index=hierarchy.indexOf(domain)
       return index < 0 ? 0 : hierarchy.length-index
     }))
-    return {value,scopeSize:domains.length || Number.MAX_SAFE_INTEGER,matchedDepth}
-  }).filter((item):item is {value:string;scopeSize:number;matchedDepth:number}=>Boolean(item))
+    const originPriority=row.recordOrigin==="model_run" ? 3 : row.recordOrigin==="system_sync" ? 2 : row.recordOrigin==="system_initialization" ? 1 : 0
+    const effectiveAt=Date.parse(row.approvedAt || row.createdAt || "") || 0
+    return {value,scopeSize:domains.length || Number.MAX_SAFE_INTEGER,matchedDepth,originPriority,effectiveAt,runId:row.runId ?? ""}
+  }).filter((item):item is {value:string;scopeSize:number;matchedDepth:number;originPriority:number;effectiveAt:number;runId:string}=>Boolean(item))
   if (!matches.length) return "未配置"
-  matches.sort((a,b)=>a.scopeSize-b.scopeSize || b.matchedDepth-a.matchedDepth)
-  const best=matches[0]
-  const samePriority=matches.filter(item=>item.scopeSize===best.scopeSize && item.matchedDepth===best.matchedDepth)
-  const values=unique(samePriority.map(item=>item.value))
-  return values.length===1 ? values[0] : "未配置"
+  matches.sort((a,b)=>
+    a.scopeSize-b.scopeSize
+    || b.matchedDepth-a.matchedDepth
+    || b.originPriority-a.originPriority
+    || b.effectiveAt-a.effectiveAt
+    || b.runId.localeCompare(a.runId)
+  )
+  return matches[0].value
 }
 
 export async function resolveApprovalPlan0622(params:{
@@ -219,7 +295,7 @@ export async function resolveApprovalPlan0622(params:{
   const employeeSync=await ensureEmployeeApprovalDigitalConfig(params.originatorId)
   if (!employeeSync.configured && employeeSync.reason) throw new Error(employeeSync.reason)
   const [configRows,assignmentRows,employeeRows,orgNameRows,relationRows,timeoutRows,opinionRows]=await Promise.all([
-    records("lib-standard-digital-config"),records("lib-standard-approval-assignment"),records("lib-standard-person"),records("lib-standard-dept"),records("lib-digital-org-relationship-0622"),records("lib-standard-model-timeout"),records("lib-standard-approval-opinion"),
+    records("lib-standard-digital-config"),records("lib-standard-approval-assignment"),records("lib-standard-person"),records("lib-standard-dept"),records("lib-digital-org-relationship-0622"),timeoutRecords("lib-standard-model-timeout"),records("lib-standard-approval-opinion"),
   ])
   const config=configRows.find(row=>dataText(row,"模型数字化编码")===params.sourceModelCode && dataText(row,"数据版本")==="0622")
   if (!config) throw new Error("未匹配到模型数字化配置")

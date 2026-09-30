@@ -1507,6 +1507,54 @@ async function archiveRun(row: ProjectRow, user: BuilderUser, runId: string, fil
   else await query("UPDATE digital_library_records SET library_name=$1,digital_id=$2,library_id=$3,identifier_values=$4,data=$5,file_name=$6,display_file_name=$7 WHERE run_id=$8", [libraryName, digitalId, libraryId, JSON.stringify(identifierValues), JSON.stringify(archiveData), fileName, displayFileName, runId])
 }
 
+
+async function synchronizeApprovedSourceConfiguration(approvalInput: Record<string, unknown>, resultName: string, completedAt: string) {
+  const sourceRunId=String(approvalInput.sourceRunId ?? approvalInput["来源业务模型运行记录"] ?? "").trim()
+  if (!sourceRunId) return
+  const source=await query<any>(`SELECT r.id AS run_id,m.name AS model_name,d.id AS record_id,d.identifier_values,d.data
+    FROM model_runs r
+    JOIN models m ON m.id=r.model_id
+    LEFT JOIN digital_library_records d ON d.run_id=r.id
+    WHERE r.id=$1
+    ORDER BY d.created_at DESC
+    LIMIT 1`,[sourceRunId])
+  const row=source.rows[0]
+  if (!row || String(row.model_name ?? "")!=="模型时限模型" || !row.record_id) return
+
+  const values=plainObject(row.identifier_values)
+  const data=plainObject(row.data)
+  const nestedInput=plainObject(data.input)
+  const nestedOutput=plainObject(data.output)
+  const timeoutValue=String(
+    values["5013001001110171"]
+    ?? data["模型时限"]
+    ?? nestedOutput.timeoutHours
+    ?? nestedInput.timeoutHours
+    ?? ""
+  ).trim()
+  const rawDomains=
+    values["5013001001110172"]
+    ?? data["业务领域集合"]
+    ?? nestedOutput.businessDomains
+    ?? nestedInput.businessDomains
+    ?? []
+  const domains=Array.isArray(rawDomains)
+    ? rawDomains.map(String).map(item=>item.trim()).filter(Boolean)
+    : String(rawDomains ?? "").split(/[,，、;；\n]/).map(item=>item.trim()).filter(Boolean)
+  const approved=["同意","通过","审批通过","已通过","允许生效"].some(item=>resultName.includes(item))
+  const nextData={
+    ...data,
+    "模型时限":timeoutValue,
+    "业务领域集合":domains.join("；"),
+    "数据版本":"0622",
+    "配置状态":approved ? "生效" : "未生效",
+    "审批结果":resultName,
+    "审批完成时间":completedAt,
+    ...(approved ? {"生效时间":completedAt} : {}),
+  }
+  await query("UPDATE digital_library_records SET data=$1 WHERE id=$2",[JSON.stringify(nextData),row.record_id])
+}
+
 async function recordModelTriggerFailure(row: ProjectRow, runId: string, fileName: string, targetModelName: string, triggerMode: TriggerMode, error: unknown) {
   const config = runConfig(row)
   const message = error instanceof Error ? error.message : String(error || "目标模型触发失败")
@@ -1877,6 +1925,10 @@ export async function handleModelTodo(user: BuilderUser, todoId: string, resultN
   const runOwner = await query<{ id: string; display_name: string; employee_code: string }>("SELECT id,display_name,employee_code FROM users WHERE id=$1", [current.run_owner_id])
   const ownerUser: BuilderUser = runOwner.rows[0] ?? user
   await archiveRun(projectRow, ownerUser, current.run_id, current.file_name, String(current.display_file_name ?? current.file_name), current.digital_id, input, finalOutput, "已归档")
+  // 配置类业务模型的正式值只能在其审批模型归档后生效。
+  // 模型时限模型在此把数字化标识值规范化回“模型时限/业务领域集合”，并记录生效状态；
+  // 审批引擎随后只读取已审批生效配置，不再被系统初始化的8值长期覆盖。
+  await synchronizeApprovedSourceConfiguration(input,resultName,completedAt)
   const triggered = await triggerAfterArchive(ownerUser, projectRow, current.run_id, current.file_name, String(current.display_file_name ?? current.file_name), current.digital_id, input, finalOutput, 0)
   const visibleTodo = triggered.todo?.ownerId === user.id ? triggered.todo : null
   return { handled: true as const, completed: true, todo: visibleTodo, runId: current.run_id, output: finalOutput, triggeredModel: triggered.targetNames[0], triggeredModels: triggered.targetNames, triggerError: triggered.error }
