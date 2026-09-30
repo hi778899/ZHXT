@@ -158,17 +158,18 @@ function evaluateThresholdRule(raw:string, values:Record<string,unknown>) {
   return {matched:details.length>0,conditional:true,details}
 }
 
-type Placement={employeeCode:string;name:string;identity:string;orgAttr:string;orgNameAttr:string;domains:string[];nature:string;level:number;rank:number}
+type Placement={employeeCode:string;name:string;identity:string;roleName:string;orgAttr:string;orgNameAttr:string;domains:string[];nature:string;level:number;rank:number}
 function placementsFromEmployee(record:RecordRow):Placement[] {
   const employeeCode=dataText(record,"员工数字化编码")
   const name=dataText(record,"员工姓名")
   const identity=dataText(record,"身份")
+  const roleName=dataText(record,"岗位/角色","岗位名称","角色名称")
   const attrs=list(record.data["组织数字化属性"])
   const orgNames=list(record.data["组织名称数字化属性"])
   const domains=list(record.data["业务领域"])
   return attrs.map((orgAttr,index)=>{
     const info=orgInfo(orgAttr)
-    return {employeeCode,name,identity,orgAttr,orgNameAttr:orgNames[index] ?? orgNames[0] ?? "",domains,nature:info.nature,level:info.level,rank:info.rank}
+    return {employeeCode,name,identity,roleName,orgAttr,orgNameAttr:orgNames[index] ?? orgNames[0] ?? "",domains,nature:info.nature,level:info.level,rank:info.rank}
   })
 }
 
@@ -252,7 +253,7 @@ export async function resolveApprovalPlan0622(params:{
     .filter(item=>item.adminBusiness && !item.adminThreshold.conditional && item.orgAttr)
     .sort((a,b)=>{ const ai=orgInfo(a.orgAttr); const bi=orgInfo(b.orgAttr); return bi.level-ai.level || ai.rank-bi.rank })
   const baseAdministrativeAssignment=baseAdministrativeCandidates[0]
-  if (!baseAdministrativeAssignment) throw new Error("未匹配到基础审批目标配置")
+  if (!baseAdministrativeAssignment) throw new Error("未匹配到基础审批级次配置")
   const targetDisplay=(orgAttr:string)=>{
     const item=activeAssignments.find(value=>value.orgAttr===orgAttr)
     if (!item) return orgAttr
@@ -273,8 +274,9 @@ export async function resolveApprovalPlan0622(params:{
     const assignment=(type==="administrative"?activeAdmin:activeTech).find(item=>item.orgAttr===placement.orgAttr)
     if (!assignment) return
     const orgName=orgNames.get(placement.orgNameAttr) ?? placement.orgNameAttr
+    const roleLabel=placement.roleName || placement.identity || assignment.rankName || (type==="technical"?"技术/业务审查人":"审批人")
     steps.push({
-      id:`0622-${type}-${steps.length+1}`,title:`${prefix} · ${orgName} · ${assignment.rankName || placement.identity}`,approvalType:type,assigneeScope:"named_user",userName:placement.name,roleLabel:assignment.rankName || placement.identity,
+      id:`0622-${type}-${steps.length+1}`,title:`${prefix} · ${orgName} · ${roleLabel}`,approvalType:type,assigneeScope:"named_user",userName:placement.name,roleLabel,
       departmentField:"department",organizationName:orgName,organizationRank:placement.orgAttr,
       requirement:type==="administrative" ? `按审批分管配置核验“${params.sourceModelName}”业务内容、数字化属性和数字化标识` : `按技术复核分管配置复核“${params.sourceModelName}”的专业业务内容和数字化依据`,
       timeoutHours:0,timeoutValue:rawTimeout,reminderRule:"按模型时限数字化库及后续提醒配置执行",outputField:type==="administrative"?"审批意见":"技术复核意见",
@@ -315,29 +317,56 @@ export async function resolveApprovalPlan0622(params:{
     techBranches.push({"复核发起人":seed.name,"复核路径":branchSteps.map(item=>`${item.organizationName}·${item.userName}`)})
   }
 
-  const finalSteps=finalDedup(steps)
-  if (!finalSteps.length) return null
-  const approverCalculation=finalSteps.map((step,index)=>({"环节序号":index+1,"环节名称":step.title,"环节类型":step.approvalType==="technical"?"技术复核":"行政审批","审批组织":step.organizationName,"审批层级岗位":step.roleLabel,"审批人":step.userName,"员工数字化编码":plainObject(step.evidence)["员工数字化编码"],"审批人计算依据":step.evidence,"审批要求":step.requirement,"规定时限":step.timeoutValue}))
-  const adminPath=finalSteps.filter(step=>step.approvalType==="administrative").map(step=>`${step.organizationName}·${step.roleLabel}（审批人：${step.userName}）`)
-  const techPath=finalSteps.filter(step=>step.approvalType==="technical").map(step=>`${step.organizationName}·${step.roleLabel}（审批人：${step.userName}）`)
-  const formalPath=finalSteps.map(step=>`${step.organizationName}·${step.roleLabel}（审批人：${step.userName}）`)
-  const baseTarget=baseAdministrativeAssignment.orgAttr
-  const baseTargetDisplay=targetDisplay(baseTarget)
-  const finalTarget=finalSteps.filter(step=>step.approvalType==="administrative").at(-1)?.organizationRank ?? baseTarget
-  const finalTargetDisplay=targetDisplay(finalTarget)
-  const technicalTarget=finalSteps.filter(step=>step.approvalType==="technical").at(-1)?.organizationRank ?? ""
+  const dedupedSteps=finalDedup(steps)
+  if (!dedupedSteps.length) return null
+
+  // V17.7.17：审批/审查级次均以本次发起人为起点，分别按实际有效节点顺序编号；
+  // 组织数字化属性仅用于组织、岗位和人员匹配，不再直接作为“审批级次”。
+  const numberText=(value:number)=>{
+    const map=["零","一","二","三","四","五","六","七","八","九","十"]
+    if (value<=10) return map[value]
+    if (value<20) return `十${map[value-10]}`
+    const tens=Math.floor(value/10),ones=value%10
+    return `${map[tens]}十${ones?map[ones]:""}`
+  }
+  let administrativeIndex=0
+  let reviewIndex=0
+  const finalSteps=dedupedSteps.map(step=>{
+    const relativeLevel=step.approvalType==="technical" ? `${numberText(++reviewIndex)}级技术/业务审查` : `${numberText(++administrativeIndex)}级审批`
+    const employeeDigitalCode=text(plainObject(step.evidence)["员工数字化编码"])
+    const role=step.roleLabel || step.userName || (step.approvalType==="technical"?"技术/业务审查人":"审批人")
+    const finalPathLabel=`${role}${employeeDigitalCode ? `（${employeeDigitalCode}）` : ""}`
+    return {...step,title:finalPathLabel,evidence:{...step.evidence,"相对审批/审查级次":relativeLevel,"最终路径显示":finalPathLabel}}
+  })
+
+  administrativeIndex=0
+  reviewIndex=0
+  const approverCalculation=finalSteps.map((step,index)=>{
+    const relativeLevel=step.approvalType==="technical" ? `${numberText(++reviewIndex)}级技术/业务审查` : `${numberText(++administrativeIndex)}级审批`
+    return {"环节序号":index+1,"相对级次":relativeLevel,"环节名称":step.title,"环节类型":step.approvalType==="technical"?"技术/业务审查":"行政审批","审批组织":step.organizationName,"组织数字化属性":step.organizationRank,"审批层级岗位":step.roleLabel,"审批人":step.userName,"员工数字化编码":plainObject(step.evidence)["员工数字化编码"],"审批人计算依据":step.evidence,"审批要求":step.requirement,"规定时限":step.timeoutValue}
+  })
+  const pathLabel=(step:Runtime0622Step)=>{
+    const code=text(plainObject(step.evidence)["员工数字化编码"])
+    return `${step.roleLabel || step.userName}${code ? `（${code}）` : ""}`
+  }
+  const adminPath=finalSteps.filter(step=>step.approvalType==="administrative").map(pathLabel)
+  const techPath=finalSteps.filter(step=>step.approvalType==="technical").map(pathLabel)
+  const formalPath=finalSteps.map(pathLabel)
+  const baseAdministrativeLevel=adminPath.length ? "一级审批" : "无"
+  const finalAdministrativeLevel=adminPath.length ? `${numberText(adminPath.length)}级审批` : "无"
+  const finalReviewLevel=techPath.length ? `${numberText(techPath.length)}级技术/业务审查` : "无"
   const pathCalculation={
     "申请人":applicant.name,"申请人员工数字化编码":applicant.employeeCode,"申请人所在部门":orgNames.get(applicant.orgNameAttr) ?? applicant.orgNameAttr,"申请人组织数字化属性":applicant.orgAttr,"申请人组织名称数字化属性":applicant.orgNameAttr,
-    "业务分类数字化属性":businessAttributes,"数字化标识集合":businessIdentifiers,"基础审批目标":baseTargetDisplay,"基础审批目标数字化属性":baseTarget,"最终审批目标":finalTargetDisplay,"最终审批目标数字化属性":finalTarget,"最终技术复核目标层级":technicalTarget || "无",
-    "组织逐级路径":organizationPath.map(code=>`${orgNames.get(code) ?? code}（${code}）`),"行政审批路径":adminPath,"技术复核路径":techPath,"技术复核分支":techBranches,"正式审批路径":formalPath,
-    "审批路径计算依据":"模型数字化编码→模型数字化配置→业务分类数字化属性/数字化标识→审批分管配置；以申请人员工数字化编码定位组织起点，按组织关系逐级向上；进入新组织后重新匹配该组织职级和人员；行政审批与技术复核分别计算后按实际人员去重，重复人员保留靠后的有效环节。",
+    "业务分类数字化属性":businessAttributes,"数字化标识集合":businessIdentifiers,"基础行政审批级次":baseAdministrativeLevel,"最终行政审批级次":finalAdministrativeLevel,"技术/业务审查级次":finalReviewLevel,
+    "组织逐级路径":organizationPath.map(code=>`${orgNames.get(code) ?? code}（${code}）`),"行政审批路径":adminPath,"技术/业务审查路径":techPath,"技术复核分支":techBranches,"正式审批路径":formalPath,
+    "审批路径计算依据":"组织数字化属性仅用于组织、岗位、人员匹配；审批与技术/业务审查分别以发起人为起点按有效节点形成相对级次，阈值仅影响需要形成的有效节点，最终路径按实际人员去重并保留靠后的有效环节。",
   }
   return {
     steps:finalSteps,actions:["同意","不同意","退回修改"],opinionRules:opinionRows.map(row=>({name:dataText(row,"审批意见","意见名称")||text(row.values["5013001001110102"]),terminal:false})).filter(item=>item.name),
-    source:"0622数字化库",businessCandidates:[params.sourceModelName,...businessAttributes],identifierValues:sourceValues,thresholdVariables:thresholdCalculation,administrativeLevel:finalTarget,technicalLevel:technicalTarget,approvalTimeoutHours:0,approvalTimeoutValue:rawTimeout,
-    assignment:{"行政审批分管配置":activeAdmin.map(item=>({"组织职级":item.orgAttr,"职级含义":item.rankName})),"技术复核分管配置":activeTech.map(item=>({"组织职级":item.orgAttr,"职级含义":item.rankName}))},organizationPath:organizationPath.map(code=>orgNames.get(code) ?? code),approverCalculation,pathCalculation,thresholdCalculation,
+    source:"0622数字化库",businessCandidates:[params.sourceModelName,...businessAttributes],identifierValues:sourceValues,thresholdVariables:thresholdCalculation,administrativeLevel:finalAdministrativeLevel,technicalLevel:finalReviewLevel,approvalTimeoutHours:0,approvalTimeoutValue:rawTimeout,
+    assignment:{"行政审批分管配置":activeAdmin.map(item=>({"组织职级":item.orgAttr,"职级含义":item.rankName})),"技术/业务审查分管配置":activeTech.map(item=>({"组织职级":item.orgAttr,"职级含义":item.rankName}))},organizationPath:organizationPath.map(code=>orgNames.get(code) ?? code),approverCalculation,pathCalculation,thresholdCalculation,
     businessContent:{sourceRunId:params.sourceRunId,sourceProjectId:params.sourceProjectId,sourceModelName:params.sourceModelName,sourceModelCode:params.sourceModelCode,sourceFileName:params.sourceFileName,sourceDisplayFileName:params.sourceDisplayFileName,sourceDigitalId:params.sourceDigitalId,businessFields:params.businessFields,businessData:params.businessData,identifierValues:sourceValues,"业务分类数字化属性":businessAttributes,"数字化标识集合":businessIdentifiers},
-    approvalComputationEvidence:{"模型数字化编码":params.sourceModelCode,"模型数字化配置":config.data,"业务分类数字化属性":businessAttributes,"数字化标识集合":businessIdentifiers,"申请人员工数字化编码":applicant.employeeCode,"申请人组织起点":applicant,"组织逐级路径":organizationPath,"基础审批目标":baseTargetDisplay,"基础审批目标数字化属性":baseTarget,"最终审批目标":finalTargetDisplay,"最终审批目标数字化属性":finalTarget,"命中阈值":thresholdCalculation,"审批人计算":approverCalculation,"审批路径计算":pathCalculation,"模型时限":rawTimeout},
+    approvalComputationEvidence:{"模型数字化编码":params.sourceModelCode,"模型数字化配置":config.data,"业务分类数字化属性":businessAttributes,"数字化标识集合":businessIdentifiers,"申请人员工数字化编码":applicant.employeeCode,"申请人组织起点":applicant,"组织逐级路径":organizationPath,"基础行政审批级次":baseAdministrativeLevel,"最终行政审批级次":finalAdministrativeLevel,"技术/业务审查级次":finalReviewLevel,"命中阈值":thresholdCalculation,"审批人计算":approverCalculation,"审批路径计算":pathCalculation,"模型时限":rawTimeout},
     modelDesignSource:params.modelDesignSource,modelDesignIdentifierValues:params.modelDesignIdentifierValues,
   }
 }

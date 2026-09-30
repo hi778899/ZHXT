@@ -22,6 +22,12 @@ function identityFor(role:string,department:string){
   if(role==="attendance_supervisor") return `${department}业务审核岗`
   return `${department}办事员`
 }
+function roleNameFor(role:string){
+  if(role==="department_manager") return "部门经理"
+  if(role==="attendance_supervisor") return "考勤主管"
+  if(role==="admin") return "普通员工"
+  return "普通员工"
+}
 
 async function ensureCurrentEmployeeCode(user:UserRow){
   if(isCurrentEmployeeDigitalCode(user.employee_code)) return user.employee_code
@@ -71,7 +77,7 @@ export async function ensureEmployeeApprovalDigitalConfig(userId:string){
   const identity=identityFor(user.role,user.department)
   const data={
     "员工数字化编码":employeeCode,"员工姓名":user.display_name,"组织数字化属性":orgAttr,"组织名称数字化属性":orgNameAttr,
-    "业务领域":businessDomains.join("；"),"身份":identity,"数据版本":"0622","数据来源":"系统账号同步形成员工信息数字化配置；审批模型正式读取员工信息数字化库"
+    "业务领域":businessDomains.join("；"),"身份":identity,"岗位/角色":roleNameFor(user.role),"数据版本":"0622","数据来源":"系统账号同步形成员工信息数字化配置；审批模型正式读取员工信息数字化库"
   }
   await upsertSystemDigitalLibraryRecord({recordId:`auto0622-person-${user.id}`,libraryId:'lib-standard-person',ownerId:user.id,digitalId:employeeCode,identifierValues:{},data,source:'system_employee_approval_config_sync'})
   await upsertSystemDigitalLibraryRecord({recordId:`auto0622-employee-${user.id}`,libraryId:'lib-digital-employee-code-0622',ownerId:user.id,digitalId:employeeCode,identifierValues:{},

@@ -57,7 +57,7 @@ assert.match(runtime0622, /lib-standard-person/)
 assert.match(runtime0622, /lib-standard-model-timeout/)
 assert.match(builder, /审批人计算/)
 assert.match(builder, /审批路径计算/)
-assert.match(runtime0622, /进入新组织后重新/)
+assert.match(runtime0622, /组织数字化属性仅用于/)
 
 // 6. 案例人员必须创建可登录账号，账号直接采用员工数字化编码，不新增硬编码密码。
 assert.match(seed, /CASE_USER_INITIAL_PASSWORD/)
@@ -72,16 +72,16 @@ assert.ok(!migration.includes('\"模型名称\":\"环保整改审批模型\"'), 
 
 console.log('V17.5 digital structure, approval and smart-selection contract passed')
 
-// 8. 前端不得继续把当前结构写成16位；审批详情要显示审批人/路径计算，智选详情要显示新中文运行结果。
+// 8. 前端不得继续把当前结构写成16位；V17.7.16后普通审批界面只展示最终审批路径，中间计算仅后台留痕。
 const workbench = fs.readFileSync(new URL('../src/ModelBuilderWorkbench.tsx', import.meta.url), 'utf8')
 const formDesigner = fs.readFileSync(new URL('../src/ModelFormDesigner.tsx', import.meta.url), 'utf8')
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 assert.ok(!workbench.includes('模型数字化编码（16位）'))
 assert.ok(!workbench.includes('模型数字化编码必须为16位数字'))
 assert.ok(!formDesigner.includes('请选择16位数字化标识'))
-assert.match(app, /审批路径计算/)
-assert.match(app, /审批人计算/)
-assert.match(app, /申请人所在部门/)
+assert.ok(!app.includes('<h4 className="section-title">审批路径计算</h4>'))
+assert.ok(!app.includes('<h4 className="section-title">审批人计算</h4>'))
+assert.match(app, /最终审批路径/)
 assert.match(app, /待处理数字化标识集合/)
 assert.match(app, /有关联数字化标识集合/)
 assert.match(app, /关联模型启动明细/)

@@ -126,7 +126,7 @@ export function leaveTemplate(): TemplatePreset {
 }
 
 export function approvalTemplate(): TemplatePreset {
-  const suggestion = baseSuggestion("审批模型", "审批管理", "全系统通用审批判断运算模型，依据0622数字化结构计算审批人、审批路径、技术复核与规定时限", "approval", ["hard_link"], "承接任一业务模型数字化库的正式入库结果，按模型数字化编码、数字化属性、数字化标识、审批分管、员工组织和组织关系计算本次审批。", "所有业务模型统一使用本审批模型；不得为请假、采购等单一业务另写审批内核。")
+  const suggestion = baseSuggestion("审批模型", "审批管理", "全系统通用审批判断运算模型，依据0622数字化结构计算相对审批/审查级次、实际办理人员、最终审批路径与规定时限", "approval", ["hard_link"], "承接任一业务模型数字化库的正式入库结果，按模型数字化编码、数字化属性、数字化标识、审批分管、员工组织和组织关系计算本次审批。", "所有业务模型统一使用本审批模型；不得为请假、采购等单一业务另写审批内核。")
   const fields = [
     f("ap-source","前序业务模型","前序业务模型","text",{digitalId:"5013999000001200",readonly:true,required:true}),
     f("ap-file","前序模型文件名","前序模型文件名","text",{digitalId:"5013001005001201",readonly:true,required:true,width:12}),
@@ -135,21 +135,21 @@ export function approvalTemplate(): TemplatePreset {
   ]
   const list = nodes([
     ["ap-read","read","读取业务数字化库","按前序模型文件名读取业务运行记录、模型数字化编码、数字化属性和数字化标识"],
-    ["ap-target","calculation","计算审批目标","模型数字化编码匹配模型数字化配置和审批分管配置；按本次数字化标识值计算阈值调整"],
+    ["ap-target","calculation","计算审批/审查级次","模型数字化编码匹配模型数字化配置和审批分管配置；组织数字化属性用于人员匹配，审批/审查级次以发起人为起点按有效节点相对编号；按本次数字化标识值调整需要形成的有效节点"],
     ["ap-person","calculation","计算审批人","申请人员工数字化编码定位组织起点；按组织职级、业务领域和员工信息计算具体审批/复核人员"],
-    ["ap-route","calculation","计算审批路径","从申请人所在组织逐级向上；进入新组织重新计算；行政审批与技术复核分别生成后合并去重"],
+    ["ap-route","calculation","计算最终审批路径","从申请人所在组织逐级匹配人员；行政审批与技术/业务审查分别按相对级次生成，再按配置合并并按实际人员去重；普通界面仅展示最终审批路径"],
     ["ap-limit","calculation","计算规定时限","按业务领域读取模型时限数字化库；0622未定义时限单位时保留原值，不自行换算"],
     ["ap-interaction","interaction","逐环节审批","仅向当前节点产生待办，逐环节记录审批意见、时间和结果"],
     ["ap-output","output","审批模型入库","形成审批人计算、审批路径计算、办理记录和最终审批结果，写入审批模型数字化库"],
   ])
   const steps = [
     standard("ap-s1","","业务模型文件名、模型数字化编码、员工数字化编码、数字化属性、数字化标识","读取0622模型数字化配置、员工信息、组织、组织关系、审批分管配置","确定本次审批计算输入","业务内容和审批计算输入",""),
-    standard("ap-s2","","审批分管业务范围、阈值设置、组织职级、员工组织数据","先算审批目标，再算具体审批人和路径；新组织重新计算负责人","形成行政审批路径和技术审查路径（现行技术复核路径）","审批人计算、审批路径计算、规定时限",""),
-    standard("ap-s3","当前审批人提交审批意见","当前环节、审批人、审批要求、规定时限、审批意见","按正式审批路径逐环节执行；本环节办理信息的规定时限直接读取模型时限数字化库形成的当前节点正式值；审批人计算仅保留运算留痕，不作为页面反向补值来源；同意进入下一环节，终止意见结束审批；办理记录耗时=办理时间-到达时间","形成完整审批办理记录；普通用户记录不展示审批/审查要求和规定时限，改为展示实际耗时","审批结果、审批状态、办理记录","审批模型数字化库正式入库后硬性触发智选模型"),
+    standard("ap-s2","","审批分管业务范围、阈值设置、组织数字化属性、员工组织数据","以发起人为起点分别计算行政审批与技术/业务审查相对级次；组织数字化属性仅用于找组织、岗位和人员；新组织重新匹配","形成内部审批/审查级次和最终审批路径","最终审批路径、内部审批人计算、内部审批路径计算、规定时限",""),
+    standard("ap-s3","当前审批人提交审批意见","当前环节、最终审批路径、规定时限、审批意见","按最终审批路径逐环节执行；规定时限直接读取模型时限数字化库形成的当前节点正式值；内部级次、组织逐级路径、阈值命中、审批人计算只保留审计，不向普通审批界面展示；同意进入下一环节，终止意见结束审批；办理记录耗时=办理时间-到达时间","形成完整审批办理记录；普通用户记录不展示审批/审查要求和规定时限，改为展示实际耗时；普通审批界面只展示最终审批路径及当前办理所需信息","审批结果、审批状态、办理记录","审批模型数字化库正式入库后硬性触发智选模型"),
   ]
   const design = baseDesign(fields,list,steps,["正式审批路径","审批状态","审批结果","审批办理记录","审批总环节","当前审批环节","当前审批人","审批人计算","审批路径计算","命中数字化标识阈值","规定时限"],{
     approvalSettings:{taskTitle:"{前序业务模型}审批",routeOutputKey:"正式审批路径",resultOutputKey:"审批结果",actions:["同意","不同意","退回修改"],steps:[],assigneeFallback:"error",routeStrategy:"0622_digital_calculation",standardSources:{digitalConfig:"模型数字化配置数字化库",approvalAssignment:"审批分管配置数字化库",personnel:"员工信息数字化库",organization:"组织数字化库",departments:"组织名称数字化库",organizationRelationship:"组织关系数字化库",timeout:"模型时限数字化库",opinions:"审批意见数字化库"},standardSourceIds:{digitalConfig:"lib-standard-digital-config",approvalAssignment:"lib-standard-approval-assignment",personnel:"lib-standard-person",organization:"lib-standard-org-rank",departments:"lib-standard-dept",organizationRelationship:"lib-digital-org-relationship-0622",timeout:"lib-standard-model-timeout",opinions:"lib-standard-approval-opinion"}},
-    formula:"模型数字化编码 → 模型数字化配置 → 业务分类数字化属性/数字化标识 → 审批分管配置 → 申请人员工数字化编码 → 组织/组织关系 → 审批人 → 行政审批路径/技术复核路径 → 合并去重 → 规定时限 → 逐环节审批 → 审批模型数字化库。",
+    formula:"模型数字化编码 → 模型数字化配置 → 业务分类数字化属性/数字化标识 → 审批分管配置 → 申请人员工数字化编码 → 组织数字化属性/组织关系匹配人员 → 行政审批与技术/业务审查相对级次 → 合并去重形成最终审批路径 → 规定时限 → 逐环节审批 → 审批模型数字化库。",
     outputDigitalMap:{正式审批路径:"5013001005001203",审批结果:"5013001005001204",审批办理记录:"5013001005001205"},formSettings:{columns:2,labelPosition:"top",descriptionMode:"inline",inputWidth:"auto",submitText:"审批模型由系统触发",showHeader:true}
   })
   const testData={cases:[{id:"ap-0622-1",name:"0622通用审批计算",input:{前序业务模型:"出差审批模型",前序模型文件名:"5011001005001001001-50110020004-20260921120000",中文显示名称:"出差审批模型-刘思琛-20260921120000",前序数字化标识:"5013001005001001001"},expectValid:true,expectedOutput:{审批状态:"待审批"}}]}

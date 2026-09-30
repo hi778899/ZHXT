@@ -666,6 +666,11 @@ function higherLevel(base: string, threshold: string) {
   if (!base) return threshold
   return levelWeight(threshold) >= levelWeight(base) ? threshold : base
 }
+function relativeLevelLabel(index:number,type:"administrative"|"technical") {
+  const map=["零","一","二","三","四","五","六","七","八","九","十"]
+  const numberText=index<=10 ? map[index] : index<20 ? `十${map[index-10]}` : String(index)
+  return type === "technical" ? `${numberText}级技术/业务审查` : `${numberText}级审批`
+}
 async function sourceIdentifierValues(input: Record<string, unknown>) {
   const sourceRunId=String(input.sourceRunId ?? "").trim()
   if (!sourceRunId) return {} as Record<string,unknown>
@@ -865,11 +870,11 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
     })
   } catch (error) {
     const message=error instanceof Error ? error.message : "审批数字化配置计算失败"
-    if (["未匹配到模型数字化配置","未匹配到申请人员工数字化配置","未匹配到基础审批目标配置","申请人所属部门未匹配到组织名称数字化配置","治理类组织人员必须在员工信息数字化库中正式维护组织职级"].includes(message)) throw new ModelBuilderError(409,message)
+    if (["未匹配到模型数字化配置","未匹配到申请人员工数字化配置","未匹配到基础审批级次配置","申请人所属部门未匹配到组织名称数字化配置","治理类组织人员必须在员工信息数字化库中正式维护组织职级"].includes(message)) throw new ModelBuilderError(409,message)
     throw error
   }
   if (current0622) return current0622
-  if (businessContext.modelName === "请休假模型") throw new ModelBuilderError(409,"未匹配到基础审批目标配置")
+  if (businessContext.modelName === "请休假模型") throw new ModelBuilderError(409,"未匹配到基础审批级次配置")
   const candidates=[...new Set([...(await approvalBusinessCandidates(input)),businessContext.modelName].map(item=>String(item).trim()).filter(Boolean))]
   const identifierValues=Object.keys(businessContext.identifierValues).length ? businessContext.identifierValues : await sourceIdentifierValues(input)
   const [adminRows,businessRows,positionRows,opinionRows,assignmentRows,thresholdRows,personnelRows,departmentRows,organizationRankRows,timeoutRows,designSnapshot]=await Promise.all([
@@ -972,45 +977,57 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
     seen.add(key); unique.unshift(step)
   }
 
-  // 审批人计算不仅保存岗位规则，还尽量解析成实际办理人员；历史/未配置数据才保留岗位占位。
+  // 审批人计算保留内部审计，但对外最终路径仅使用“岗位/角色（员工数字化编码）”。
   const approvalOwnerInput={...input,department:startDepartment || input.department,"所属部门":startDepartment || input["所属部门"]}
-  const resolvedApproverNames = await Promise.all(unique.map(async step=>{
+  const resolvedApproverMeta = await Promise.all(unique.map(async step=>{
     try {
       const ownerId=await resolveApprovalOwner(step,approvalOwnerInput,String(row.owner_id ?? ""))
-      const person=await query<{display_name:string}>("SELECT display_name FROM users WHERE id=$1 LIMIT 1",[ownerId])
-      return person.rows[0]?.display_name || step.userName || step.roleLabel || "待匹配"
+      const person=await query<{display_name:string;employee_code:string}>("SELECT display_name,employee_code FROM users WHERE id=$1 LIMIT 1",[ownerId])
+      return {name:person.rows[0]?.display_name || step.userName || step.roleLabel || "待匹配",employeeCode:String(person.rows[0]?.employee_code ?? "").trim()}
     } catch {
-      return step.userName || step.roleLabel || "待匹配"
+      const personRow=personnelRows.find(item=>valueText(item,"5013001001002002")===(step.userName || step.roleLabel || ""))
+      return {name:step.userName || step.roleLabel || "待匹配",employeeCode:valueText(personRow,"5013001001002001")}
     }
   }))
-  const approverCalculation = unique.map((step,index)=>({
-    "环节序号":index+1,
-    "环节名称":step.title,
-    "环节类型":step.approvalType === "technical" ? "技术/业务审查" : "行政审批",
-    "审批组织":step.organizationName || startDepartment || "按数字化库配置",
-    "审批层级岗位":step.organizationRank || step.roleLabel || "按数字化库配置",
-    "审批人":resolvedApproverNames[index],
-    "审批人计算依据":String(plainObject(step.evidence).organizationRule ?? plainObject(step.evidence).rule ?? "按组织数字化属性、组织名称数字化属性、人员组织岗位配置数字化库匹配"),
-    "审批要求":step.requirement || "按数字化库配置",
-    "规定时限":step.timeoutValue || (Number(step.timeoutHours ?? 0)>0 ? String(Number(step.timeoutHours)) : "未配置"),
-  }))
-  const routeLabel=(step:ApprovalStepDefinition,index:number)=>`${step.title}（审批人：${resolvedApproverNames[index]}）`
+  let administrativeSequence=0
+  let technicalSequence=0
+  const approverCalculation = unique.map((step,index)=>{
+    const relativeLevel=step.approvalType === "technical" ? relativeLevelLabel(++technicalSequence,"technical") : relativeLevelLabel(++administrativeSequence,"administrative")
+    return {
+      "环节序号":index+1,"相对级次":relativeLevel,
+      "环节名称":step.title,
+      "环节类型":step.approvalType === "technical" ? "技术/业务审查" : "行政审批",
+      "审批组织":step.organizationName || startDepartment || "按数字化库配置",
+      "组织数字化属性":step.organizationRank || "",
+      "审批层级岗位":step.organizationRank || step.roleLabel || "按数字化库配置",
+      "审批人":resolvedApproverMeta[index].name,"员工数字化编码":resolvedApproverMeta[index].employeeCode,
+      "审批人计算依据":String(plainObject(step.evidence).organizationRule ?? plainObject(step.evidence).rule ?? "按组织数字化属性、组织名称数字化属性、人员组织岗位配置数字化库匹配"),
+      "审批要求":step.requirement || "按数字化库配置",
+      "规定时限":step.timeoutValue || (Number(step.timeoutHours ?? 0)>0 ? String(Number(step.timeoutHours)) : "未配置"),
+    }
+  })
+  const routeLabel=(step:ApprovalStepDefinition,index:number)=>{
+    const role=step.organizationRank || step.roleLabel || resolvedApproverMeta[index].name
+    const code=resolvedApproverMeta[index].employeeCode
+    return `${role}${code ? `（${code}）` : ""}`
+  }
   const administrativePath = unique.map((step,index)=>({step,index})).filter(item=>item.step.approvalType !== "technical").map(item=>routeLabel(item.step,item.index))
   const technicalPath = unique.map((step,index)=>({step,index})).filter(item=>item.step.approvalType === "technical").map(item=>routeLabel(item.step,item.index))
   const formalPath = unique.map((step,index)=>routeLabel(step,index))
+  const relativeAdministrativeLevel=administrativePath.length ? relativeLevelLabel(administrativePath.length,"administrative") : "无"
+  const relativeTechnicalLevel=technicalPath.length ? relativeLevelLabel(technicalPath.length,"technical") : "无"
   const pathCalculation = {
     "申请人":applicantName || "—",
     "申请人所在部门":startDepartment || "—",
-    "基础审批目标":baseAdministrativeTarget || "—",
-    "最终审批目标":administrativeLevel || baseAdministrativeTarget || "—",
-    "基础技术业务审查目标层级":baseTechnicalTarget || "—",
-    "最终技术业务审查目标层级":technicalLevel || baseTechnicalTarget || "—",
+    "基础行政审批级次":administrativePath.length ? "一级审批" : "无",
+    "最终行政审批级次":relativeAdministrativeLevel,
+    "技术/业务审查级次":relativeTechnicalLevel,
     "组织逐级路径":organizationPath,
     "行政审批路径":administrativePath,
     "技术业务审查路径":technicalPath,
     "正式审批路径":formalPath,
     "审批路径明细":approverCalculation,
-    "审批路径计算依据":"从申请人所在组织开始；未达到最终审批目标时按组织关系进入上级/分管组织；进入新组织后重新读取该组织路径规则和人员职级配置；技术/业务审查路径独立计算后按配置合并并按实际人员去重。",
+    "审批路径计算依据":"组织数字化属性仅用于匹配组织、岗位和人员；行政审批与技术/业务审查均以发起人为起点按实际有效节点形成相对级次，最终按配置合并并按实际人员去重。",
   }
   const thresholdCalculation = thresholdVariables.map(item=>({
     "阈值类型":item.thresholdType || "阈值",
@@ -1032,8 +1049,8 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
     businessCandidates:candidates,
     identifierValues,
     thresholdVariables,
-    administrativeLevel,
-    technicalLevel,
+    administrativeLevel:relativeAdministrativeLevel,
+    technicalLevel:relativeTechnicalLevel,
     approvalTimeoutHours,
     assignment:{administrativeRank:adminRank,technicalRank},
     organizationPath,
@@ -1047,7 +1064,8 @@ async function resolveDigitalApprovalPlan(row: ProjectRow, input: Record<string,
     },
     approvalComputationEvidence:{
       sourceModel:businessContext.modelName,sourceModelCode:businessContext.modelCode,sourceProjectId:businessContext.sourceProjectId,
-      baseAdministrativeTarget,adjustedAdministrativeTarget:administrativeLevel,baseTechnicalTarget,adjustedTechnicalTarget:technicalLevel,
+      baseAdministrativeLevel:administrativePath.length ? "一级审批" : "无",adjustedAdministrativeLevel:relativeAdministrativeLevel,technicalReviewLevel:relativeTechnicalLevel,
+      organizationAttributeTargets:{baseAdministrativeTarget,adjustedAdministrativeTarget:administrativeLevel,baseTechnicalTarget,adjustedTechnicalTarget:technicalLevel},
       matchedThresholds:thresholdVariables,applicant:applicantName,startDepartment,organizationPath,
       organizationRule:"从申请人所在组织开始；进入新的上级/分管组织后重新读取该组织规则和人员职级配置",
       nodeRule:"节点类型 + 审批层级/岗位匹配数字化配置，形成审批/审查要求、规定时限、提醒规则和输出字段",
@@ -1358,8 +1376,8 @@ function libraryArchiveData(row: ProjectRow, runId: string, fileName: string, di
       "当前审批环节":output["当前审批环节"] ?? output.approvalCurrentStep ?? 0,"当前审批人":output["当前审批人"] ?? output.approvalCurrentApprover ?? "",
       "审批意见":output["审批意见"] ?? output.approvalOpinion ?? "","审批时间":output["审批时间"] ?? output.approvalTime ?? "","审批状态":output["审批状态"] ?? output.approvalStatus ?? "",
       "审批结果":output["审批结果"] ?? output.approvalResult ?? "","审批结果文件":output["审批结果文件"] ?? output.approvalResultPdf ?? "",
-      "命中数字化标识阈值":output["命中数字化标识阈值"] ?? [],"最终审批目标层级":output["最终审批目标层级"] ?? output.approvalAdministrativeLevel ?? "",
-      "技术业务审查目标层级":output["技术业务审查目标层级"] ?? output.approvalTechnicalLevel ?? "","规定时限":output["规定时限"] ?? "",
+      "命中数字化标识阈值":output["命中数字化标识阈值"] ?? [],"基础行政审批级次":output["基础行政审批级次"] ?? "",
+      "最终行政审批级次":output["最终行政审批级次"] ?? output.approvalAdministrativeLevel ?? "","技术业务审查级次":output["技术业务审查级次"] ?? output.approvalTechnicalLevel ?? "","规定时限":output["规定时限"] ?? "",
       "审批人计算":output["审批人计算"] ?? [],"审批路径计算":output["审批路径计算"] ?? {},"正式审批路径节点":output["正式审批路径节点"] ?? output["审批人计算"] ?? [],
       "审批办理记录":output["审批办理记录"] ?? output.approvalProcess ?? [],
     }
@@ -1657,9 +1675,12 @@ export async function runPublishedModel(user: BuilderUser, modelName: string, in
       execution.output["正式审批路径节点"]=digitalPlan.approverCalculation
       execution.output["命中数字化标识阈值"]=digitalPlan.thresholdCalculation
       execution.output["正式审批路径"]=asArray<string>(digitalPlan.pathCalculation["正式审批路径"]).join(" → ") || digitalPlan.steps.map(item=>item.title).join(" → ")
-      execution.output["基础审批目标"]=digitalPlan.pathCalculation["基础审批目标"] ?? digitalPlan.approvalComputationEvidence.baseAdministrativeTarget ?? ""
-      execution.output["最终审批目标"]=digitalPlan.pathCalculation["最终审批目标"] ?? digitalPlan.administrativeLevel
-      execution.output["技术业务审查目标层级"]=digitalPlan.technicalLevel
+      execution.output["基础行政审批级次"]=digitalPlan.pathCalculation["基础行政审批级次"] ?? (digitalPlan.steps.some(item=>item.approvalType === "administrative") ? "一级审批" : "无")
+      execution.output["最终行政审批级次"]=digitalPlan.pathCalculation["最终行政审批级次"] ?? digitalPlan.administrativeLevel
+      execution.output["技术业务审查级次"]=digitalPlan.pathCalculation["技术/业务审查级次"] ?? digitalPlan.technicalLevel
+      delete execution.output["基础审批目标"]
+      delete execution.output["最终审批目标"]
+      delete execution.output["技术业务审查目标层级"]
       execution.output["审批状态"]="待审批"
       execution.output.approvalStatus="待审批"
     }

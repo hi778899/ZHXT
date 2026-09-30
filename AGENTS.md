@@ -25,7 +25,7 @@
 
 涉及模型、数字化库、审批、智选时，必须同时阅读 `.ai/rules/02_ONE_MODEL_ONE_LIBRARY_RULES.md` 至 `.ai/rules/08_RUNTIME_ENGINE_RULES.md`，以及 `.ai/rules/16_MODEL_DIGITAL_CODE_FILENAME_RULES.md`。
 
-涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
+涉及审批模型内部判断与运行，必须同时阅读 `.ai/rules/17_APPROVAL_MODEL_INTERNAL_LOGIC_RULES.md` 与 `.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`；涉及驾驶舱、待办/已办/办结、个人统计与排名，必须同时阅读 `.ai/rules/18_DASHBOARD_RULES.md`。
 
 ## 3. 不可违反的红线
 
@@ -71,3 +71,12 @@
 `用户最新明确要求 > .ai/rules/ 项目业务规则 > 已确认架构设计 > 现有代码实现 > AI 自行推断`
 
 未经明确授权，不得自行改变核心业务口径。
+
+
+## V17.7.16 审批界面规则
+
+审批相关开发必须遵守 `.ai/rules/20_APPROVAL_RELATIVE_LEVEL_RULES.md`：组织数字化属性参与内部审批/审查级次计算，普通审批界面只展示最终审批路径 `Path_final`，不得展示基础/最终目标、组织逐级路径、阈值命中等中间过程。
+## V17.7.17 审批运行实现规则
+
+所有审批相关代码必须执行相对级次规则：行政审批和技术/业务审查分别从发起人后的第一个有效人员节点开始编号；组织数字化属性仅用于组织、岗位和人员匹配。普通审批待办、已办、办结只能展示最终审批路径 `Path_final`，路径节点格式为“岗位/角色名称（员工数字化编码）”，不得展示中间计算区块。
+
