@@ -153,7 +153,7 @@ export function approvalTemplate(): TemplatePreset {
     outputDigitalMap:{正式审批路径:"5013001005001203",审批结果:"5013001005001204",审批办理记录:"5013001005001205"},formSettings:{columns:2,labelPosition:"top",descriptionMode:"inline",inputWidth:"auto",submitText:"审批模型由系统触发",showHeader:true}
   })
   const testData={cases:[{id:"ap-0622-1",name:"0622通用审批计算",input:{前序业务模型:"出差审批模型",前序模型文件名:"5011001005001001001-50110020004-20260921120000",中文显示名称:"出差审批模型-刘思琛-20260921120000",前序数字化标识:"5013001005001001001"},expectValid:true,expectedOutput:{审批状态:"待审批"}}]}
-  const configuration={...baseConfig("审批模型","5011001099001001001","5013001005001001",["hard_link"]),digitalStructureVersion:"0622",relations:[{id:"rel-approval-smart",enabled:true,mode:"hard_link",targetModelName:"智选模型",condition:{fieldKey:"",operator:"always",value:""},description:"审批模型数字化库正式入库后固定启动通用智选模型"}],afterArchiveEnabled:true,nextModelName:"智选模型"}
+  const configuration={...baseConfig("审批模型","5011001099001001001","5013001005001001",["hard_link"]),digitalStructureVersion:"0622",relations:[{id:"system-approval-smart",enabled:true,mode:"hard_link",targetModelName:"智选模型",condition:{fieldKey:"",operator:"always",value:""},description:"系统固定链路：审批模型数字化库正式入库后必须启动通用智选模型"}],afterArchiveEnabled:true,nextModelName:"智选模型"}
   return {suggestion,design,testData,configuration}
 }
 

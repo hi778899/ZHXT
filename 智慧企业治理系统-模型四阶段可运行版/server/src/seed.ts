@@ -55,6 +55,36 @@ async function ensurePublishedProject(modelName: string, userId: string, templat
   await query("UPDATE models SET can_start=true WHERE id=$1", [model.rows[0].id])
 }
 
+async function ensureSystemApprovalSmartLink() {
+  const approval = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    WHERE m.name='审批模型' ORDER BY p.updated_at DESC LIMIT 1`)
+  const row = approval.rows[0]
+  if (row?.id) {
+    const config = row.configuration && typeof row.configuration === "object" ? { ...row.configuration } : {}
+    const relations = Array.isArray(config.relations) ? config.relations.filter((item: any) => String(item?.targetModelName ?? "").trim() !== "智选模型") : []
+    config.relations = [{ id:"system-approval-smart",enabled:true,mode:"hard_link",targetModelName:"智选模型",condition:{fieldKey:"",operator:"always",value:""},description:"系统固定链路：审批模型数字化库正式入库后必须启动通用智选模型" }, ...relations]
+    config.afterArchiveEnabled = true
+    config.nextModelName = "智选模型"
+    const startModes = Array.isArray(config.startModes) ? config.startModes.map(String) : []
+    config.startModes = startModes.includes("hard_link") ? startModes : [...startModes, "hard_link"]
+    await query("UPDATE model_projects SET configuration=$1,updated_at=now() WHERE id=$2", [JSON.stringify(config), row.id])
+  }
+
+  const smart = await query<{ id: string; configuration: Record<string, unknown> }>(`SELECT p.id,p.configuration
+    FROM model_projects p JOIN models m ON m.id=p.model_id
+    WHERE m.name='智选模型' ORDER BY p.updated_at DESC LIMIT 1`)
+  const smartRow = smart.rows[0]
+  if (smartRow?.id) {
+    const config = smartRow.configuration && typeof smartRow.configuration === "object" ? { ...smartRow.configuration } : {}
+    const startModes = Array.isArray(config.startModes) ? config.startModes.map(String) : []
+    if (!startModes.includes("hard_link")) {
+      config.startModes = [...startModes, "hard_link"]
+      await query("UPDATE model_projects SET configuration=$1,updated_at=now() WHERE id=$2", [JSON.stringify(config), smartRow.id])
+    }
+  }
+}
+
 async function ensureDraftProject(modelName: string, userId: string, template: TemplatePreset) {
   const model = await query<{ id: string }>("SELECT id FROM models WHERE name=$1", [modelName])
   if (!model.rows[0]?.id) return
@@ -147,6 +177,8 @@ async function seed() {
   await ensurePublishedProject("智选模型", userId, smart)
   await ensurePublishedProject("审批模型", userId, approval)
   await ensurePublishedProject("请休假模型", userId, leave)
+  // 系统固定模型簇链路必须兼容历史已编辑项目；不能依赖 version=1 的模板刷新。
+  await ensureSystemApprovalSmartLink()
 
   // 四个建设阶段、数字化建设、基础数字化库和审批/智选配置均通过独立模型运行。它们和普通业务模型一样归档后进入通用审批→智选。
   for (const item of getTemplateCatalog().filter(item => ["模型建设","数字化建设","基础数字化库","审批智选配置"].includes(item.group))) {

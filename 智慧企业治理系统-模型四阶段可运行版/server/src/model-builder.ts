@@ -418,6 +418,12 @@ export async function publishProject(userId: string, projectId: string) {
     const stageStatuses = await listBuildStageExecutions(projectId)
     for (const item of stageStatuses) if (item.status !== "已完成") problems.push(`${item.stageModelName}尚未完成“本模型 → 审批模型 → 智选模型”闭环`)
   }
+  if (modelTypeOf(row) === "approval") {
+    const existingRelations = configRelations(config).filter(item => String(item.targetModelName ?? "").trim() !== "智选模型")
+    config.relations = [mandatoryApprovalSmartRelation(), ...existingRelations]
+    config.afterArchiveEnabled = true
+    config.nextModelName = "智选模型"
+  }
   const relations = configRelations(config)
   for (const relation of relations.filter(item => item.enabled !== false)) {
     const nextModelName = String(relation.targetModelName ?? "").trim()
@@ -430,7 +436,8 @@ export async function publishProject(userId: string, projectId: string) {
     else {
       const targetStartModes = asArray<string>(plainObject(target.configuration).startModes).map(String)
       const requiredMode = relation.mode === "smart" ? "smart" : "hard_link"
-      if (targetStartModes.length && !targetStartModes.includes(requiredMode)) problems.push(`目标模型“${nextModelName}”未配置“${requiredMode}”启动方式，不能使用当前模型关系触发`)
+      const mandatoryApprovalSmart = modelTypeOf(row) === "approval" && nextModelName === "智选模型" && requiredMode === "hard_link"
+      if (targetStartModes.length && !targetStartModes.includes(requiredMode) && !mandatoryApprovalSmart) problems.push(`目标模型“${nextModelName}”未配置“${requiredMode}”启动方式，不能使用当前模型关系触发`)
       const targetIds = asArray<string>(plainObject(target.configuration).digitalIdentities).map(String).filter(isDigitalIdentifier)
       relation.targetDigitalId = targetIds[targetIds.length - 1] ?? ""
     }
@@ -445,7 +452,7 @@ export async function publishProject(userId: string, projectId: string) {
 type TriggerMode = "manual" | "hard_link" | "smart" | "schedule" | "quantity"
 type RelationOperator = "always" | "eq" | "neq" | "contains" | "notEmpty" | "gt" | "gte" | "lt" | "lte"
 type ModelRelation = { id?: string; enabled?: boolean; mode?: "hard_link" | "smart"; targetModelName?: string; targetDigitalId?: string; condition?: { fieldKey?: string; operator?: RelationOperator; value?: unknown }; description?: string }
-type RunOptions = { triggerMode?: TriggerMode; sourceDepth?: number }
+type RunOptions = { triggerMode?: TriggerMode; sourceDepth?: number; systemLink?: "approval_to_smart" }
 
 function configRelations(configValue: unknown): ModelRelation[] {
   const config = plainObject(configValue)
@@ -453,6 +460,21 @@ function configRelations(configValue: unknown): ModelRelation[] {
   if (configured.length) return configured
   if (Boolean(config.afterArchiveEnabled) && String(config.nextModelName ?? "").trim()) return [{ id: "legacy-relation", enabled: true, mode: "hard_link", targetModelName: String(config.nextModelName), condition: { operator: "always" }, description: "兼容旧版归档后模型关系" }]
   return []
+}
+
+function mandatoryApprovalSmartRelation(): ModelRelation {
+  return { id: "system-approval-smart", enabled: true, mode: "hard_link", targetModelName: "智选模型", condition: { fieldKey: "", operator: "always", value: "" }, description: "系统固定链路：审批模型数字化库正式入库后必须启动通用智选模型" }
+}
+
+function archiveRelations(row: ProjectRow, input: Record<string, unknown>, output: Record<string, unknown>): ModelRelation[] {
+  const type = modelTypeOf(row)
+  if (type === "smart") return []
+  const configured = configRelations(runConfig(row)).filter(item => item.enabled !== false && item.mode !== "smart" && relationMatches(item, input, output))
+  if (type !== "approval") return configured
+  // 审批 → 智选属于模型簇系统硬性链接，不允许因历史配置缺失、删除、禁用或版本升级未刷新而断链。
+  // 配置中如存在智选关系，仅作为可见配置快照；真正执行时统一使用系统固定关系，并避免重复触发。
+  const otherRelations = configured.filter(item => String(item.targetModelName ?? "").trim() !== "智选模型")
+  return [mandatoryApprovalSmartRelation(), ...otherRelations]
 }
 function relationMatches(relation: ModelRelation, input: Record<string, unknown>, output: Record<string, unknown>) {
   const condition = relation.condition ?? {}
@@ -1409,7 +1431,7 @@ async function triggerAfterArchive(user: BuilderUser, row: ProjectRow, runId: st
   // 业务模型/审批模型归档时只执行固定硬性链接；“智选”关系保存在业务模型配置中，由通用智选模型完成判断后再执行。
   const relations = type === "smart"
     ? (await sourceBusinessSmartRelations(input, output)).relations
-    : configRelations(runConfig(row)).filter(item => item.enabled !== false && item.mode !== "smart" && relationMatches(item, input, output))
+    : archiveRelations(row, input, output)
   if (!relations.length) return { todo: null as RuntimeTodo | null, targetNames: [] as string[] }
   if (depth >= 8) return { todo: null as RuntimeTodo | null, targetNames: relations.map(item => String(item.targetModelName ?? "")).filter(Boolean), error: "跨模型触发链超过 8 层，已停止继续触发" }
   const targetInput = {
@@ -1428,7 +1450,8 @@ async function triggerAfterArchive(user: BuilderUser, row: ProjectRow, runId: st
     if (!targetName) continue
     try {
       const mode: TriggerMode = type === "smart" ? "smart" : "hard_link"
-      const next = await runPublishedModel(user, targetName, targetInput, { triggerMode: mode, sourceDepth: depth + 1 })
+      const systemLink = type === "approval" && targetName === "智选模型" ? "approval_to_smart" as const : undefined
+      const next = await runPublishedModel(user, targetName, targetInput, { triggerMode: mode, sourceDepth: depth + 1, systemLink })
       targetNames.push(targetName)
       if (!firstTodo && next.todo) firstTodo = next.todo
     } catch (error) {
@@ -1471,7 +1494,8 @@ export async function runPublishedModel(user: BuilderUser, modelName: string, in
   const triggerMode = options.triggerMode ?? "manual"
   const config = runConfig(row)
   const startModes = asArray<string>(config.startModes).map(String)
-  if (startModes.length && !startModes.includes(triggerMode)) throw new ModelBuilderError(409, `模型“${modelName}”未配置“${triggerMode}”启动方式`)
+  const mandatoryApprovalSmartStart = options.systemLink === "approval_to_smart" && modelName === "智选模型" && triggerMode === "hard_link"
+  if (startModes.length && !startModes.includes(triggerMode) && !mandatoryApprovalSmartStart) throw new ModelBuilderError(409, `模型“${modelName}”未配置“${triggerMode}”启动方式`)
   const input = plainObject(inputValue)
   const type = modelTypeOf(row)
   if (type === "approval") normalizeApprovalInputAliases(input)
@@ -1483,6 +1507,9 @@ export async function runPublishedModel(user: BuilderUser, modelName: string, in
     input.businessDisplayFileName = source.displayFileName
     input.businessDigitalId = source.digitalId
     input.businessRunId = source.runId
+    // 原业务上下文是在审批输入链中追溯得到的；追溯完成后必须再次回填中文字段，
+    // 否则智选模型设计中的“业务模型/业务模型文件名”等必填字段会在 executeDesign 前仍为空。
+    normalizeSmartInputAliases(input)
   }
   const execution = executeDesign(row.design, input)
   if (!execution.valid) throw new ModelBuilderError(400, execution.errors.join("；"))
