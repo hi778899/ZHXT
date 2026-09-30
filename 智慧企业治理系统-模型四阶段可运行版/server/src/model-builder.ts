@@ -1076,6 +1076,12 @@ async function createApprovalTodo(row: ProjectRow, runId: string, ownerId: strin
   const timeoutHours = Number(currentDef?.timeoutHours ?? output.approvalTimeoutHours ?? 0)
   const dueAt = Number.isFinite(timeoutHours) && timeoutHours > 0 ? new Date(arrivedAt.getTime() + timeoutHours * 3600000) : null
   const businessContent=plainObject(output.approvalBusinessContent)
+  // 当前办理页的规定时限必须与本次审批运算快照一致。
+  // 审批人计算是本次正式路径逐节点计算结果，优先作为当前节点展示值；
+  // currentDef/output 仅用于兼容历史或未生成独立计算快照的数据。
+  const approverCalculation = asArray<Record<string,unknown>>(output["审批人计算"])
+  const computedTimeoutValue = String(approverCalculation[stepIndex]?.["规定时限"] ?? "").trim()
+  const currentTimeoutValue = computedTimeoutValue || String(currentDef?.timeoutValue ?? "").trim() || String(output["规定时限"] ?? "").trim()
   const content = JSON.stringify({
     type: "approval_task_v3",
     sourceModelName: String(businessContent.sourceModelName ?? input.sourceModelName ?? "业务事项"),
@@ -1095,7 +1101,7 @@ async function createApprovalTodo(row: ProjectRow, runId: string, ownerId: strin
     approvalArrivedAt: arrivedAt.toISOString(),
     approvalDueAt: dueAt?.toISOString() ?? "",
     approvalTimeoutHours: timeoutHours,
-    currentTimeoutValue: String(currentDef?.timeoutValue ?? output["规定时限"] ?? ""),
+    currentTimeoutValue,
     thresholdVariables: asArray<Record<string,unknown>>(output.approvalThresholdVariables),
     approvalComputationEvidence: plainObject(output.approvalComputationEvidence),
     "审批人计算": asArray<Record<string,unknown>>(output["审批人计算"]),

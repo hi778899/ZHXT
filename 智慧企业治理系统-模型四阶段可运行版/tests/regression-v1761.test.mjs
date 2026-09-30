@@ -9,7 +9,7 @@ const approvalRules = fs.readFileSync(new URL('../.ai/rules/17_APPROVAL_MODEL_IN
 const dashboardRules = fs.readFileSync(new URL('../.ai/rules/18_DASHBOARD_RULES.md', import.meta.url), 'utf8')
 
 for (const rules of [approvalSmartRules, approvalRules]) {
-  assert.match(rules, /当前有效版本：V17\.6\.1/, '审批与智选当前有效规则必须保持 V17.6.1')
+  assert.match(rules, /当前有效版本：V17\.(?:6\.1|7(?:\.\d+)?)/, '审批与智选当前有效规则不得回退到 V17.6.1 之前')
   assert.match(rules, /耗时\s*=\s*办理时间\s*-\s*到达时间/, '审批规则必须明确耗时=办理时间-到达时间')
 }
 assert.match(dashboardRules, /当前有效版本：V17\.7/, '驾驶舱规则已由后续 V17.7 工作台规则接管')
