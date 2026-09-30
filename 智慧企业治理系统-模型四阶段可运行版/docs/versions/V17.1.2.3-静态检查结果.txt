@@ -1,0 +1,6 @@
+V17.1.2.3 静态检查
+
+1. 已针对 data-linkage.ts 中 calculations/expressions 类型守卫做 TypeScript strict 最小复现检查：PASS。
+2. 已确认原 TS7006 对应的 find 回调参数不再是隐式 any。
+3. 保留 V17.1.2.2 的迁移与数字化库全字段逻辑，未修改数据库迁移序号。
+4. 当前生成环境无法访问 npm registry，因此完整 pnpm build:all 需在部署服务器执行。

@@ -1,0 +1,9 @@
+V17.1.2 静态检查结果
+
+1. server/src/data-linkage.ts：TypeScript 语法检查通过；当前执行环境未安装项目 node_modules，因此完整 server tsc 无法解析 @types/node。
+2. src/App.tsx：新增历史 input/output 回退映射代码语法检查无新增语法错误；完整前端类型检查需要安装 React/@xyflow 依赖。
+3. server/migrations/014_model_backed_standard_libraries.sql：保留 type_name / attr_name / attr_description 歧义修复。
+4. server/migrations/015_backfill_legacy_digital_library_values.sql：新增历史数据按字段 key → 16位数字化标识回填逻辑。
+5. 数字化库后端增加运行期补偿：读取记录和作为数据源查询时会自动修复缺失 identifier_values。
+6. 前端保持“中文字段名称 + 16位数字化标识”双层表头，并可从历史 data.input/data.output 按 fieldKey 回退显示。
+7. 不包含清库、删表、删除 PostgreSQL volume 的操作。
