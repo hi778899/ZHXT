@@ -289,7 +289,7 @@ async function ensureAllPublishedModelDigitalConfigs(userId:string) {
     WHERE p.status='published' AND m.can_start=true
     ORDER BY m.name`)
   await query(`CREATE TABLE IF NOT EXISTS model_digital_config_completeness_issues(
-    id uuid PRIMARY KEY,model_id uuid NOT NULL,project_id uuid,model_name text NOT NULL,model_code text,reason text NOT NULL,detected_at timestamptz NOT NULL DEFAULT now(),resolved_at timestamptz
+    id uuid PRIMARY KEY,model_id text NOT NULL,project_id text,model_name text NOT NULL,model_code text,reason text NOT NULL,detected_at timestamptz NOT NULL DEFAULT now(),resolved_at timestamptz
   )`)
   for(const row of published.rows){
     const modelCode=String(row.model_code ?? "").trim()

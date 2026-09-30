@@ -4,8 +4,8 @@
 
 CREATE TABLE IF NOT EXISTS model_digital_config_completeness_issues (
   id uuid PRIMARY KEY,
-  model_id uuid NOT NULL,
-  project_id uuid,
+  model_id text NOT NULL,
+  project_id text,
   model_name text NOT NULL,
   model_code text,
   reason text NOT NULL,

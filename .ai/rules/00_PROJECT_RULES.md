@@ -226,3 +226,7 @@
 
 系统初始化和系统同步不是“直接写库”的例外，而是对应数据产生模型的特殊运行方式：先形成 `system_initialization` 或 `system_sync` 模型运行，再以该运行文件名归档到对应数字化库。`std-*`、`src0622-*`、`auto0622-*` 等历史技术键只能作为 `legacy_record_id` 审计信息，不得作为文件名、运行身份或模型簇链路键。
 
+
+
+## V17.7.23 数据库主键类型一致性
+涉及模型/项目主键的 migration、审计表、异常表和关联表，必须遵守 `.ai/rules/24_DATABASE_ID_TYPE_RULES.md`；`models.id` 与 `model_projects.id` 当前为 TEXT，禁止擅自声明为 UUID。

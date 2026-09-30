@@ -1,6 +1,6 @@
 # 智慧企业治理系统——AI规则说明
 
-> 当前规则修订：V17.7.22。模型数字化配置完整性由“个别模型补丁”升级为全系统已发布模型扫描、自动补齐、发布即校验；除审批/智选模型自身外，所有已发布可运行模型统一进入审批→智选模型簇。
+> 当前规则修订：V17.7.23。继续执行全系统模型数字化配置完整性机制，并新增数据库主键类型一致性规则：`models.id` / `model_projects.id` 为 TEXT，不得把 `model-digital-...` 等合法字符串主键误转为 UUID。
 
 `.ai/rules/` 目录中的 Markdown 文件是本项目的软件架构、模型建设、数字化、数据库、测试、发布及 AI 辅助开发的最高级项目约束。
 
@@ -55,6 +55,7 @@
 | `.ai/rules/21_APPROVAL_FINAL_PATH_EXECUTION_RULES.md` | 最终审批路径执行、节点推进、归档完成判定与智选触发前置规则 |
 | `.ai/rules/22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md` | 可运行模型数字化配置完整性、考勤主管审查配置及基础模型审批前置规则 |
 | `.ai/rules/23_MODEL_TIMEOUT_EFFECTIVE_RULES.md` | 模型时限配置审批后生效、当前有效值选择及审批运行读取规则 |
+| `.ai/rules/24_DATABASE_ID_TYPE_RULES.md` | 数据库主键/引用字段类型一致性规则 |
 
 
 ## V17.7.8 新增
@@ -117,6 +118,6 @@
 
 - 新增 `22_MODEL_DIGITAL_CONFIG_COMPLETENESS_RULES.md`；补齐考勤主管审批/审查数据及请假类型标准模型、模型时限模型的当前0622模型数字化配置。
 
-## V17.7.22 新增
+## V17.7.23 新增
 
 - 新增 `23_MODEL_TIMEOUT_EFFECTIVE_RULES.md`：修复模型时限模型审批归档后仍命中系统初始化8值的问题；人工时限配置仅在审批同意后生效，数字化标识优先读取，同等范围按最新审批生效配置覆盖系统基线。
