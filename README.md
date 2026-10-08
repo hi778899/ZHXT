@@ -1,6 +1,6 @@
 # 智慧企业治理系统 · 模型四阶段可运行版（ZHXT）
 
-> 当前正式版本：**V17.7.26 / 18.3.6.30** · 完整版本历史见 [Tags](https://github.com/hi778899/ZHXT/tags)
+> 当前正式版本：**V17.7.27 / 18.3.6.31** · 完整版本历史见 [Tags](https://github.com/hi778899/ZHXT/tags)
 
 ## 仓库导航
 
@@ -20,6 +20,13 @@
 ---
 
 ## 版本变更记录
+
+## V17.7.27 / 18.3.6.31 Docker 受限网络构建修复
+
+- Docker 构建新增 `NPM_REGISTRY` 参数，默认使用 `https://registry.npmmirror.com`，避免服务器访问 `registry.npmjs.org` 超时时 Corepack 无法下载 pnpm。
+- `COREPACK_NPM_REGISTRY` 与 `npm_config_registry` 同时指向同一仓库，分别覆盖 pnpm 本体下载和项目依赖下载。
+- runtime 阶段不再执行 `corepack enable` / `pnpm install`，改为从 build 阶段复制已裁剪的生产依赖，避免第二次联网。
+- 如企业内网有 npm 私服，可在 `.env` 中直接把 `NPM_REGISTRY` 改成内部仓库地址；可访问官方 npm 时也可改回 `https://registry.npmjs.org`。
 
 ## V17.7.26 / 18.3.6.30 审批智选基础模型库运行入库
 
@@ -71,7 +78,7 @@
 
 # 智慧企业治理系统
 
-当前规则基线：**18.3.6.30 / V17.7.26**。
+当前规则基线：**18.3.6.31 / V17.7.27**。
 
 本版已同步更新模型库界面规则、前端统一目录和全模型目录 API；底层模型、数字化库、审批与智选运行规则保持不变。
 
@@ -110,6 +117,14 @@ cp .env.example .env
 ```bash
 docker compose up -d --build
 ```
+
+若服务器无法访问官方 npm，无需改 Dockerfile，`.env` 中保持：
+
+```bash
+NPM_REGISTRY=https://registry.npmmirror.com
+```
+
+企业内网有 npm 私服时，将该值替换为内部仓库地址即可。
 
 停止：
 

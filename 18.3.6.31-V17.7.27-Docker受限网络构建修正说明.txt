@@ -1,0 +1,30 @@
+18.3.6.31 / V17.7.27 Docker受限网络构建修正说明
+
+一、故障根因
+1. package.json 固定 packageManager=pnpm@10.33.4。
+2. node:22-alpine 中 Corepack 默认从 registry.npmjs.org 下载 pnpm。
+3. 现场 Debian 主机对 npm 官方 registry 的 IPv4 连接超时，IPv6 不可达，导致 build/runtime 两个阶段均在 pnpm install 前失败。
+4. 原 Dockerfile 在 build 与 runtime 两个阶段分别执行依赖安装，重复放大网络依赖。
+
+二、本版修复
+1. Dockerfile 增加 NPM_REGISTRY 构建参数，默认 https://registry.npmmirror.com。
+2. COREPACK_NPM_REGISTRY 指向 NPM_REGISTRY，确保 Corepack 下载 pnpm 不再固定访问官方 npm。
+3. npm_config_registry 指向同一 NPM_REGISTRY，确保 pnpm 项目依赖从同一仓库下载。
+4. build 阶段完成安装、编译后执行 pnpm prune --prod。
+5. runtime 阶段直接复制 build 阶段生产 node_modules，不再执行 corepack/pnpm install，不再产生第二次 npm 网络访问。
+6. docker-compose.yml 将 NPM_REGISTRY 作为 build arg 传入。
+7. .env.example 增加 NPM_REGISTRY，支持切换官方 npm、npmmirror 或企业内部 npm 私服。
+
+三、部署
+升级代码后执行：
+  docker compose down
+  docker compose build --no-cache app
+  docker compose up -d
+  docker compose ps
+  docker compose logs --tail=200 app
+
+默认无需额外修改；若公司有内部 npm 镜像，在 .env 中设置：
+  NPM_REGISTRY=https://你的内部npm仓库地址
+
+四、范围
+本版仅修改构建/部署链路及相应规则、文档、回归测试，不修改审批、智选、模型库、数字化库、数据库业务逻辑。
