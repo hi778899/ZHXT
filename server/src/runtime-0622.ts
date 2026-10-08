@@ -1,5 +1,6 @@
 import { query } from "./db.js"
 import { ensureEmployeeApprovalDigitalConfig } from "./employee-digital-config.js"
+import { assertFoundationReady } from "./foundation-model-libraries.js"
 
 const plainObject = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const asArray = <T>(value: unknown): T[] => Array.isArray(value) ? value as T[] : []
@@ -292,6 +293,7 @@ export async function resolveApprovalPlan0622(params:{
   originatorId:string; originatorName:string; businessFields:Array<Record<string,unknown>>; businessData:Record<string,unknown>; identifierValues:Record<string,unknown>; modelDesignSource:string; modelDesignIdentifierValues:Record<string,unknown>
 }):Promise<Runtime0622ApprovalPlan|null> {
   if (!/^5011001\d{12}$/.test(params.sourceModelCode)) return null
+  await assertFoundationReady("approval")
   const employeeSync=await ensureEmployeeApprovalDigitalConfig(params.originatorId)
   if (!employeeSync.configured && employeeSync.reason) throw new Error(employeeSync.reason)
   const [configRows,assignmentRows,employeeRows,orgNameRows,relationRows,timeoutRows,opinionRows]=await Promise.all([
@@ -467,6 +469,7 @@ export async function resolveSmartPlan0622(input:Record<string,unknown>,output:R
   const approvalResult=text(input["审批结果"] ?? input.approvalResult ?? sourceOutput["审批结果"] ?? sourceOutput.approvalResult ?? output["审批结果"] ?? output.approvalResult)
   const pendingIdentifiers=Object.entries(identifierValues).filter(([,value])=>valueItems(value).length>0).map(([key])=>key)
   if (!current) return {current:false,approvalResult,businessSourceModelName,businessFileName,businessDisplayFileName,businessDigitalId,pendingIdentifiers,associatedIdentifiers:[],identifierCounts:[],specialResult:"历史兼容",normalResult:"历史兼容",associatedModels:[],instances:[],smartDecision:"历史数据按原智选配置兼容处理"}
+  await assertFoundationReady("smart")
   if (!approvalPassed(approvalResult)) return {current:true,approvalResult,businessSourceModelName,businessFileName,businessDisplayFileName,businessDigitalId,pendingIdentifiers,associatedIdentifiers:[],identifierCounts:pendingIdentifiers.map(id=>({"数字化标识":id,"有效数据条数":valueItems(identifierValues[id]).length})),specialResult:"审批未通过，不执行正常关联",normalResult:"未执行",associatedModels:[],instances:[],smartDecision:`审批结果“${approvalResult || "未形成"}”，智选终止正常关联触发`}
   const [associationRows,configRows]=await Promise.all([records("lib-standard-identifier-trigger"),records("lib-standard-digital-config")])
   const associations=associationRows.map(row=>({source:dataText(row,"数字化标识")||text(row.values["5013001001210401"]),related:dataText(row,"关联数字化标识")||text(row.values["5013001001210402"])})).filter(item=>item.source&&item.related)

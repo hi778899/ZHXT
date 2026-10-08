@@ -1,5 +1,6 @@
 import { syncActiveEmployeeApprovalDigitalConfigs } from "./employee-digital-config.js"
-import { syncSystemStandardLibraryRecords, upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
+import { runModelBackedDigitalLibraryRecord, syncSystemStandardLibraryRecords } from "./data-linkage.js"
+import { auditFoundationReadiness } from "./foundation-model-libraries.js"
 import { randomUUID } from "node:crypto"
 import { closePool, query } from "./db.js"
 import { hashPassword } from "./security.js"
@@ -175,14 +176,14 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
   const MEETING_MANAGEMENT_DOMAIN="5012001008000000000"
 
   // 1. “数字化管理”作为基础数字化/运行标准模型的正式业务分类，不借用其他业务领域。
-  await upsertSystemDigitalLibraryRecord({
-    recordId:"v17720-business-digital-governance",libraryId:"lib-digital-business-classification-0622",ownerId:userId,digitalId:DIGITAL_GOVERNANCE_DOMAIN,identifierValues:{},
+  await runModelBackedDigitalLibraryRecord({
+    recordId:"v17720-business-digital-governance",libraryId:"lib-digital-business-classification-0622",expectedProducerModelName:"业务分类模型",ownerId:userId,digitalId:DIGITAL_GOVERNANCE_DOMAIN,identifierValues:{},
     data:{"一级编码":"007","二级编码":"000","三级编码":"000","四级编码":"000","业务名称":"数字化管理","业务分类数字化属性":DIGITAL_GOVERNANCE_DOMAIN,"数据版本":"0622","数据来源":"V17.7.20基础数字化模型审批配置补齐"},source:"system_approval_foundation_sync"
   })
 
   // V17.7.24：会议类模型拥有独立“会议管理”业务分类，不能继续借用0622中的环保(006)或数字化管理(007)。
-  await upsertSystemDigitalLibraryRecord({
-    recordId:"v17724-business-meeting-management",libraryId:"lib-digital-business-classification-0622",ownerId:userId,digitalId:MEETING_MANAGEMENT_DOMAIN,identifierValues:{},
+  await runModelBackedDigitalLibraryRecord({
+    recordId:"v17724-business-meeting-management",libraryId:"lib-digital-business-classification-0622",expectedProducerModelName:"业务分类模型",ownerId:userId,digitalId:MEETING_MANAGEMENT_DOMAIN,identifierValues:{},
     data:{"一级编码":"008","二级编码":"000","三级编码":"000","四级编码":"000","业务名称":"会议管理","业务分类数字化属性":MEETING_MANAGEMENT_DOMAIN,"数据版本":"0622","数据来源":"V17.7.24会议标准/会议管理模型数字化配置补齐"},source:"system_approval_foundation_sync"
   })
 
@@ -194,7 +195,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     const row=ownership.rows[0]; const data={...(row.data ?? {})}
     data["业务领域集合"]=appendDigitalValue(data["业务领域集合"],DIGITAL_GOVERNANCE_DOMAIN)
     data["V17.7.20配置说明"]="设备管理部承担数字化管理类基础模型维护；正式审批仍由审批模型按数字化库动态计算"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-business-ownership",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "501200402006"),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-business-ownership",expectedProducerModelName:"业务归属模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "501200402006"),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
   }
 
 
@@ -206,7 +207,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     const data={...(row.data ?? {})}
     data["业务领域集合"]=appendDigitalValue(data["业务领域集合"],MEETING_MANAGEMENT_DOMAIN)
     data["V17.7.24配置说明"]="董事会/总经理组成人员承接公司级会议管理业务；会议类模型使用独立会议管理数字化属性"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-business-ownership",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织名称数字化属性"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-business-ownership",expectedProducerModelName:"业务归属模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织名称数字化属性"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
   }
 
   // 同步公司治理组织中的人员业务领域，使会议审批能够按员工信息数字化库找到真实人员节点。
@@ -218,7 +219,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     const data={...(row.data ?? {})}
     data["业务领域"]=appendDigitalValue(data["业务领域"],MEETING_MANAGEMENT_DOMAIN)
     data["V17.7.24配置说明"]="公司治理组织人员补齐会议管理业务领域，用于会议类审批人员匹配"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-person",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["员工数字化编码"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-person",expectedProducerModelName:"员工信息模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["员工数字化编码"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
   }
 
 
@@ -230,7 +231,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     const data={...(row.data ?? {})}
     data["行政审批分管业务属性集合"]=appendDigitalValue(data["行政审批分管业务属性集合"],MEETING_MANAGEMENT_DOMAIN)
     data["V17.7.24配置说明"]="公司治理层补齐会议管理行政审批分管，会议节点仍按发起人组织关系和实际人员动态形成"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织职级"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",expectedProducerModelName:"审批分管配置模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织职级"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_meeting_management_config_sync"})
   }
 
   // 3. 四/五级机构负责人增加数字化管理行政审批分管；业务审核岗确保考勤管理技术/业务审查分管。
@@ -242,7 +243,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     if (orgAttr === "501200302041" || orgAttr === "501200302051") data["行政审批分管业务属性集合"]=appendDigitalValue(data["行政审批分管业务属性集合"],DIGITAL_GOVERNANCE_DOMAIN)
     if (orgAttr === "501200302046") data["技术复核分管业务属性集合"]=appendDigitalValue(data["技术复核分管业务属性集合"],ATTENDANCE_DOMAIN)
     data["V17.7.20配置说明"]="补齐数字化管理行政审批及考勤管理业务审核岗审查配置"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? orgAttr),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",expectedProducerModelName:"审批分管配置模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? orgAttr),identifierValues:row.identifier_values ?? {},data,source:"system_approval_foundation_sync"})
   }
 
   // 4. 考勤主管员工信息数字化配置强校验：即使历史已有正式记录，也补齐业务审核岗、组织人事部和考勤管理业务领域。
@@ -263,7 +264,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     data["岗位/角色"]="考勤主管"
     data["数据版本"]="0622"
     data["数据来源"]="V17.7.20考勤主管审批/审查数字化配置补齐"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row?.id ?? `auto0622-person-${user.id}`),libraryId:"lib-standard-person",ownerId:user.id,digitalId:String(user.employee_code),identifierValues:row?.identifier_values ?? {},data,source:"system_attendance_supervisor_config_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row?.id ?? `auto0622-person-${user.id}`),libraryId:"lib-standard-person",expectedProducerModelName:"员工信息模型",ownerId:user.id,digitalId:String(user.employee_code),identifierValues:row?.identifier_values ?? {},data,source:"system_attendance_supervisor_config_sync"})
   }
 
   // 5. 请假类型标准模型、模型时限模型补齐0622模型数字化配置。
@@ -273,7 +274,7 @@ async function ensureApprovalFoundationDigitalConfigs(userId:string) {
     {recordId:"v17720-model-config-timeout",code:"5011001001100022001",name:"模型时限模型",attributes:DIGITAL_GOVERNANCE_DOMAIN},
   ]
   for (const item of modelConfigs) {
-    await upsertSystemDigitalLibraryRecord({recordId:item.recordId,libraryId:"lib-standard-digital-config",ownerId:userId,digitalId:item.code,identifierValues:{},
+    await runModelBackedDigitalLibraryRecord({recordId:item.recordId,libraryId:"lib-standard-digital-config",expectedProducerModelName:"模型数字化配置模型",ownerId:userId,digitalId:item.code,identifierValues:{},
       data:{"模型数字化编码":item.code,"模型名称":item.name,"数字化属性集合":item.attributes,"数字化标识集合":"","数据版本":"0622","数据来源":"V17.7.20补齐基础数字化模型审批入口配置"},source:"system_model_digital_config_sync"})
   }
 }
@@ -365,7 +366,7 @@ async function ensureAllPublishedModelDigitalConfigs(userId:string) {
       "模型数字化编码":modelCode,"模型名称":row.name,"数字化属性集合":configuredAttrs.length ? configuredAttrs.join("；") : resolvedAttr,
       "数字化标识集合":identifiers.join("；"),"数据版本":"0622","数据来源":"V17.7.21全系统已发布模型数字化配置完整性同步；人工正式配置优先保留"
     }
-    await upsertSystemDigitalLibraryRecord({recordId:String(current.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",ownerId:current.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"system_model_config_completeness_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(current.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",expectedProducerModelName:"模型数字化配置模型",ownerId:current.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"system_model_config_completeness_sync"})
     await query("UPDATE model_digital_config_completeness_issues SET resolved_at=now() WHERE model_id=$1 AND resolved_at IS NULL",[row.model_id])
   }
 
@@ -378,7 +379,7 @@ async function ensureAllPublishedModelDigitalConfigs(userId:string) {
     const data={...(row.data ?? {})}
     for(const domain of usedDomains) data["行政审批分管业务属性集合"]=appendDigitalValue(data["行政审批分管业务属性集合"],domain)
     data["V17.7.21配置说明"]="全系统已发布模型使用到的业务分类均具备基础行政审批分管；相对审批级次仍由实际发起人组织和人员动态计算"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织职级"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-approval-assignment",expectedProducerModelName:"审批分管配置模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? data["组织职级"] ?? ""),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
   }
   // 默认8小时模型时限是原0622所有普通业务的通用基线；把新增业务域纳入同一基线，而不是在代码中生成时限。
   const timeout=await query<any>(`SELECT id,digital_id,identifier_values,data,owner_id FROM digital_library_records
@@ -387,7 +388,7 @@ async function ensureAllPublishedModelDigitalConfigs(userId:string) {
     const row=timeout.rows[0]; const data={...(row.data ?? {})}
     for(const domain of usedDomains) data["业务领域集合"]=appendDigitalValue(data["业务领域集合"],domain)
     data["V17.7.21配置说明"]="全系统已发布模型缺省时限业务域完整性补齐；实际规定时限仍唯一来自模型时限数字化库"
-    await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-model-timeout",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "8"),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
+    await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId:"lib-standard-model-timeout",expectedProducerModelName:"模型时限模型",ownerId:row.owner_id ?? userId,digitalId:String(row.digital_id ?? "8"),identifierValues:row.identifier_values ?? {},data,source:"system_model_config_completeness_sync"})
   }
 
   const unresolved=await query<any>(`SELECT model_name,model_code,reason FROM model_digital_config_completeness_issues WHERE resolved_at IS NULL ORDER BY model_name LIMIT 30`)
@@ -476,10 +477,13 @@ async function seed() {
     if (template) await ensurePublishedProject(item.name, userId, template)
   }
 
-  // V17.7.20：基础数字化模型同样是普通业务模型，发布后必须具备模型数字化配置和可计算审批分管数据。
-  // 所有补齐数据均通过对应数据产生模型形成真实 model_runs，再进入数字化库。
+  // V17.7.26：基础模型项目就绪后，第一步先把历史0622/系统事实物化为真实 system_initialization/system_sync 模型运行。
+  // 后续所有可确定补齐都在已有正式数字化库基础上运算，禁止用 seed 常量绕过“运行模型→数据入库”。
+  await syncSystemStandardLibraryRecords()
+
+  // V17.7.20+V17.7.26：可唯一确定的审批/智选基础数据通过对应数据产生模型真实运行补齐。
   await ensureApprovalFoundationDigitalConfigs(userId)
-  // V17.7.21：不再仅补“请假类型标准模型/模型时限模型”，扫描所有已发布可运行模型并补齐当前0622模型数字化配置、基础行政审批分管与模型时限业务域。
+  // V17.7.21+V17.7.26：扫描所有已发布可运行模型；可确定项运行模型补齐，无法唯一确定项只记录异常，不猜测。
   await ensureAllPublishedModelDigitalConfigs(userId)
 
   // 会议模型簇不是“写死流程”。这里仅建立可编辑的四阶段建设项目，默认保持草稿，用户可逐阶段校核、测试后发布。
@@ -487,9 +491,6 @@ async function seed() {
     const template = getTemplatePreset(item.key)
     if (template) await ensureDraftProject(item.name, userId, template)
   }
-
-  // 方案A：数据产生模型和当前19位编码全部就绪后，再将系统初始化/同步数据通过对应模型运行归档；此时不得留下 run_id=NULL 的正式库记录。
-  await syncSystemStandardLibraryRecords()
 
   const notices = [["关于驾驶舱要素调整的通知", "通知", "2026-09-01"], ["模型建设阶段说明更新", "说明", "2026-08-30"], ["数字化库使用指引发布", "指引", "2026-08-28"], ["系统维护安排", "通知", "2026-08-24"], ["公共信息阅读提醒", "提醒", "2026-08-22"], ["驾驶舱功能优化公告", "公告", "2026-08-20"], ["本月模型运行情况汇总", "汇总", "2026-08-18"]]
   for (const [title, type, publishedAt] of notices) await query("INSERT INTO notices(id,title,type,published_at,content) VALUES($1,$2,$3,$4,$5) ON CONFLICT (lower(trim(title)), lower(trim(type)), published_at) DO NOTHING", [randomUUID(), title, type, publishedAt, `${title}正文内容。请各部门结合实际使用情况及时反馈问题，持续优化驾驶舱的操作体验。`])
@@ -503,6 +504,11 @@ async function seed() {
   const employeeSync=await syncActiveEmployeeApprovalDigitalConfigs()
   const employeeSyncFailures=employeeSync.filter(item=>!item.configured)
   if (employeeSyncFailures.length) console.warn("Employee digital config sync skipped for some users",employeeSyncFailures)
+
+  // V17.7.26：就绪审计只记录问题并限制对应审批/智选运行，不得因单个基础模型库缺陷使整个应用启动失败。
+  const foundationAudit=await auditFoundationReadiness()
+  const foundationIssues=foundationAudit.flatMap(item=>item.issues)
+  if(foundationIssues.length) console.warn(`审批/智选基础模型库完整性存在待处理项：${foundationIssues.map(item=>`${item.producerModelName} → ${item.libraryId}：${item.reason}`).join("；")}`)
 
 }
 

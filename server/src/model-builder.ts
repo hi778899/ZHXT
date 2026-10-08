@@ -3,7 +3,7 @@ import { query } from "./db.js"
 import { evaluateExpression, ExpressionError } from "./expression.js"
 import { blankTemplate, getTemplatePreset } from "./model-templates.js"
 import { buildDisplayFileName, buildRuntimeFileName, getEmployeeDigitalCode, isCurrentEmployeeDigitalCode, isCurrentModelDigitalCode, isCurrentRuntimeFileName, isDigital16, isDigitalIdentifier, isEmployeeDigitalCode, isModelDigitalCode, timeCode } from "./digital-codes.js"
-import { buildIdentifierValues, ensureModelDigitalLibrary, upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
+import { buildIdentifierValues, ensureModelDigitalLibrary, runModelBackedDigitalLibraryRecord } from "./data-linkage.js"
 import { ModelBuilderError } from "./errors.js"
 import { resolveApprovalPlan0622, resolveSmartPlan0622 } from "./runtime-0622.js"
 export { ModelBuilderError } from "./errors.js"
@@ -423,7 +423,7 @@ async function ensurePublishedProjectDigitalConfig(userId:string,row:ProjectRow,
   if(!attr) throw new ModelBuilderError(400,`模型“${row.name}”未配置可确定的业务分类数字化属性，不能发布。请先在业务分类/模型数字化配置数字化库中完成配置`)
   const identifiers=asArray<string>(config.digitalIdentities).map(v=>String(v).trim()).filter(isDigitalIdentifier)
   const data={...oldData,"模型数字化编码":modelCode,"模型名称":row.name,"数字化属性集合":oldAttrs.length?oldAttrs.join("；"):attr,"数字化标识集合":identifiers.join("；"),"数据版本":"0622","数据来源":"V17.7.21模型发布完整性自动校验/同步"}
-  await upsertSystemDigitalLibraryRecord({recordId:String(existing.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",ownerId:existing.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"model_publish_config_completeness"})
+  await runModelBackedDigitalLibraryRecord({recordId:String(existing.rows[0]?.id ?? `auto0622-model-config-${row.model_id}`),libraryId:"lib-standard-digital-config",expectedProducerModelName:"模型数字化配置模型",ownerId:existing.rows[0]?.owner_id ?? userId,digitalId:modelCode,identifierValues:{},data,source:"model_publish_config_completeness"})
 }
 
 export async function publishProject(userId: string, projectId: string) {

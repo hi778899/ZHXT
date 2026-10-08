@@ -1,6 +1,6 @@
 import { query } from "./db.js"
 import { isCurrentEmployeeDigitalCode, nextEmployeeDigitalCode } from "./digital-codes.js"
-import { upsertSystemDigitalLibraryRecord } from "./data-linkage.js"
+import { runModelBackedDigitalLibraryRecord } from "./data-linkage.js"
 
 type UserRow={id:string;username:string;display_name:string;department:string;employee_code:string;role:string;status:string}
 type RecordRow={id:string;digital_id:string;data:Record<string,unknown>}
@@ -79,8 +79,8 @@ export async function ensureEmployeeApprovalDigitalConfig(userId:string){
     "员工数字化编码":employeeCode,"员工姓名":user.display_name,"组织数字化属性":orgAttr,"组织名称数字化属性":orgNameAttr,
     "业务领域":businessDomains.join("；"),"身份":identity,"岗位/角色":roleNameFor(user.role),"数据版本":"0622","数据来源":"系统账号同步形成员工信息数字化配置；审批模型正式读取员工信息数字化库"
   }
-  await upsertSystemDigitalLibraryRecord({recordId:`auto0622-person-${user.id}`,libraryId:'lib-standard-person',ownerId:user.id,digitalId:employeeCode,identifierValues:{},data,source:'system_employee_approval_config_sync'})
-  await upsertSystemDigitalLibraryRecord({recordId:`auto0622-employee-${user.id}`,libraryId:'lib-digital-employee-code-0622',ownerId:user.id,digitalId:employeeCode,identifierValues:{},
+  await runModelBackedDigitalLibraryRecord({recordId:`auto0622-person-${user.id}`,libraryId:'lib-standard-person',expectedProducerModelName:'员工信息模型',triggerMode:'system_sync',ownerId:user.id,digitalId:employeeCode,identifierValues:{},data,source:'system_employee_approval_config_sync'})
+  await runModelBackedDigitalLibraryRecord({recordId:`auto0622-employee-${user.id}`,libraryId:'lib-digital-employee-code-0622',expectedProducerModelName:'员工数字化模型',triggerMode:'system_sync',ownerId:user.id,digitalId:employeeCode,identifierValues:{},
     data:{"员工数字化编码":employeeCode,"员工姓名":user.display_name,"数据版本":"0622","数据来源":"系统账号同步形成员工数字化编码记录"},source:'system_employee_code_sync'})
   return {configured:true,employeeCode,source:"synchronized",organizationDigitalAttribute:orgAttr,organizationNameDigitalAttribute:orgNameAttr}
 }

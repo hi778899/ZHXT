@@ -31,7 +31,7 @@ assert.match(linkage,/legacy_identifier_repair/);
 assert.doesNotMatch(linkage,/UPDATE digital_library_records SET identifier_values/);
 assert.match(linkage,/数字化库方案A物化未完成/);
 
-assert.match(employee,/upsertSystemDigitalLibraryRecord/);
+assert.match(employee,/runModelBackedDigitalLibraryRecord/); // V17.7.26沿用真实模型运行归档语义，升级入口名称
 assert.doesNotMatch(employee,/INSERT INTO digital_library_records/);
 
 assert.match(seed,/ensureInfrastructureDigitalProjects/);

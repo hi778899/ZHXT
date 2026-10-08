@@ -24,7 +24,7 @@ assert.match(builder, /"统计分析模型文件名":output\["统计分析模型
 assert.match(dataRules, /模型业务数据的唯一正式来源是其归属数字化库/, '总数据源规则必须明确数字化库唯一正式来源')
 assert.match(smartRules, /当前有效版本：V17\.7\.(?:[5-9]|\d{2,})/, '审批智选规则不得回退到 V17.7.5 之前')
 assert.match(internalRules, /当前有效版本：V17\.7\.(?:[5-9]|\d{2,})/, '审批内部规则不得回退到 V17.7.5 之前')
-assert.match(dashboardRules, /当前有效版本：V17\.7\.5/, '驾驶舱规则必须升级为 V17.7.5')
+assert.match(dashboardRules, /当前有效版本：V17\.7\.(?:[5-9]|\d{2,})/, '驾驶舱规则不得回退到 V17.7.5 之前')
 assert.match(dashboardRules, /不得增加“这仍是一条完整、有效的智选模型运行记录”等解释性结论/, '驾驶舱规则必须禁止解释性有效性结论')
 
 console.log('V17.7.5 digital-library source-of-truth regression passed')

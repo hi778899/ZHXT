@@ -1,3 +1,9 @@
+# V17.7.26 审批/智选基础模型库运行入库规则
+
+涉及审批/智选基础数据、seed、系统初始化/同步、模型数字化配置完整性、员工配置同步时，必须先阅读 `.ai/rules/26_APPROVAL_SMART_BASE_MODEL_LIBRARY_RULES.md`。禁止通过直接写正式 `digital_library_records` 的方式补基础业务数据；必须运行对应数据产生模型后入库。
+
+---
+
 # V17.7.22 模型时限配置生效规则
 
 涉及审批规定时限、模型时限模型或 `lib-standard-model-timeout` 的修改，必须先阅读 `.ai/rules/23_MODEL_TIMEOUT_EFFECTIVE_RULES.md`。人工模型时限配置只在其审批归档同意后生效；禁止继续把初始化8值作为固定默认。

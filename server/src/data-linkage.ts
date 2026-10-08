@@ -124,7 +124,7 @@ async function libraryColumns(libraryId: string): Promise<DigitalLibraryColumn[]
 }
 
 
-type SystemDigitalLibraryRecordInput = {
+export type SystemDigitalLibraryRecordInput = {
   recordId: string
   libraryId: string
   ownerId?: string | null
@@ -133,6 +133,8 @@ type SystemDigitalLibraryRecordInput = {
   data: Record<string, unknown>
   createdAt?: string | Date | null
   source?: string
+  triggerMode?: "system_initialization" | "system_sync"
+  expectedProducerModelName?: string
 }
 
 type ProducerRuntime = {
@@ -141,6 +143,7 @@ type ProducerRuntime = {
   modelId: string
   modelName: string
   projectId: string
+  projectStatus: string
   modelCode: string
 }
 
@@ -162,20 +165,21 @@ async function resolveRuntimeActor(preferredOwnerId?: string | null): Promise<Ru
 
 async function resolveProducerRuntime(libraryId: string): Promise<ProducerRuntime> {
   const result = await query<any>(`SELECT l.id AS library_id,l.name AS library_name,l.model_id,m.name AS model_name,
-      p.id AS project_id,COALESCE(dc.code,p.configuration->>'modelCode','') AS model_code
+      p.id AS project_id,p.status AS project_status,COALESCE(dc.code,p.configuration->>'modelCode','') AS model_code
     FROM digital_libraries l
     LEFT JOIN models m ON m.id=l.model_id
     LEFT JOIN LATERAL (
-      SELECT mp.id,mp.configuration FROM model_projects mp WHERE mp.model_id=l.model_id
+      SELECT mp.id,mp.status,mp.configuration FROM model_projects mp WHERE mp.model_id=l.model_id
       ORDER BY CASE WHEN mp.status='published' THEN 0 ELSE 1 END,mp.updated_at DESC LIMIT 1
     ) p ON true
     LEFT JOIN digital_codes dc ON dc.object_type='model' AND dc.object_id=l.model_id AND dc.code ~ '^5011001[0-9]{12}$'
     WHERE l.id=$1 AND l.status='active'`,[libraryId])
   const row=result.rows[0]
   if(!row?.model_id) throw new ModelBuilderError(409,`数字化库“${libraryId}”未配置数据产生模型`)
+  if(!row?.project_id || String(row.project_status ?? "")!=="published") throw new ModelBuilderError(409,`数字化库“${row.library_name ?? libraryId}”的数据产生模型“${row.model_name ?? "未配置"}”没有已发布项目`)
   const modelCode=String(row.model_code ?? "").trim()
   if(!isCurrentModelDigitalCode(modelCode)) throw new ModelBuilderError(409,`数字化库“${row.library_name ?? libraryId}”的数据产生模型未配置当前19位模型数字化编码`)
-  return { libraryId:String(row.library_id), libraryName:String(row.library_name), modelId:String(row.model_id), modelName:String(row.model_name ?? "数字化模型"), projectId:String(row.project_id ?? ""), modelCode }
+  return { libraryId:String(row.library_id), libraryName:String(row.library_name), modelId:String(row.model_id), modelName:String(row.model_name ?? "数字化模型"), projectId:String(row.project_id ?? ""), projectStatus:String(row.project_status ?? ""), modelCode }
 }
 
 async function allocateSystemRunNames(producer: ProducerRuntime, actor: RuntimeActor, at: Date) {
@@ -193,8 +197,10 @@ async function allocateSystemRunNames(producer: ProducerRuntime, actor: RuntimeA
  * V17.7.14 方案A：系统初始化/系统同步也必须先形成对应数据产生模型的真实运行，再写入数字化库。
  * 禁止 seed/sync 直接制造 run_id=NULL 的正式数字化库记录。
  */
-export async function upsertSystemDigitalLibraryRecord(input: SystemDigitalLibraryRecordInput) {
+export async function runModelBackedDigitalLibraryRecord(input: SystemDigitalLibraryRecordInput) {
   const identifierValues=isRecord(input.identifierValues) ? input.identifierValues : {}
+  const producer=await resolveProducerRuntime(input.libraryId)
+  if(input.expectedProducerModelName && producer.modelName!==input.expectedProducerModelName) throw new ModelBuilderError(409,`数字化库“${producer.libraryName}”的数据产生模型应为“${input.expectedProducerModelName}”，当前为“${producer.modelName}”`)
   const existing=await query<any>(`SELECT id,run_id,owner_id,created_at,identifier_values,data,file_name,display_file_name,legacy_record_id
     FROM digital_library_records WHERE id=$1 LIMIT 1`,[input.recordId])
   const previous=existing.rows[0]
@@ -208,16 +214,16 @@ export async function upsertSystemDigitalLibraryRecord(input: SystemDigitalLibra
     }
   }
 
-  const producer=await resolveProducerRuntime(input.libraryId)
   const actor=await resolveRuntimeActor(input.ownerId ?? previous?.owner_id ?? null)
   const useHistoricalTime=Boolean(previous && !previous.run_id)
   const runAt=useHistoricalTime ? new Date(previous.created_at) : input.createdAt ? new Date(input.createdAt) : new Date()
   const safeRunAt=Number.isFinite(runAt.getTime()) ? runAt : new Date()
   const names=await allocateSystemRunNames(producer,actor,safeRunAt)
   const runId=randomUUID()
-  const triggerMode=useHistoricalTime ? "system_initialization" : "system_sync"
-  const runInput={systemManaged:true,systemSource:input.source ?? triggerMode,legacyRecordId:input.recordId,libraryId:producer.libraryId}
-  const runOutput={identifierValues,data:input.data,libraryId:producer.libraryId,libraryName:producer.libraryName}
+  let triggerMode=useHistoricalTime ? "system_initialization" : "system_sync"
+  if(input.triggerMode) triggerMode=input.triggerMode
+  const runInput={systemManaged:true,systemSource:input.source ?? triggerMode,foundationProducerModel:producer.modelName,legacyRecordId:input.recordId,libraryId:producer.libraryId}
+  const runOutput={identifierValues,data:input.data,libraryId:producer.libraryId,libraryName:producer.libraryName,producerModelName:producer.modelName}
   await query(`INSERT INTO model_runs(id,model_id,project_id,owner_id,file_name,display_file_name,digital_id,input_data,output_data,status,created_at,completed_at,trigger_mode,source_run_id)
     VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,'已归档',$10,$10,$11,NULL)`,[
       runId,producer.modelId,producer.projectId,actor.id,names.fileName,names.displayFileName,input.digitalId,JSON.stringify(runInput),JSON.stringify(runOutput),safeRunAt,triggerMode])
@@ -232,6 +238,11 @@ export async function upsertSystemDigitalLibraryRecord(input: SystemDigitalLibra
       input.recordId,producer.modelId,producer.projectId,runId,actor.id,producer.libraryName,input.digitalId,producer.libraryId,JSON.stringify(identifierValues),JSON.stringify(input.data),names.fileName,names.displayFileName,input.recordId,triggerMode,safeRunAt])
   }
   return {recordId:input.recordId,runId,fileName:names.fileName,changed:true}
+}
+
+/** 兼容旧调用名；新代码必须使用 runModelBackedDigitalLibraryRecord 以明确“运行模型→数据入库”语义。 */
+export async function upsertSystemDigitalLibraryRecord(input:SystemDigitalLibraryRecordInput) {
+  return runModelBackedDigitalLibraryRecord(input)
 }
 
 export async function materializeLegacyDigitalLibraryRuns() {
@@ -263,14 +274,14 @@ export async function syncSystemStandardLibraryRecords() {
       "5013001001002005": row.role,"5013001001002006": row.status === "active" ? "启用" : "停用","5013001001002007": rankByRole[String(row.role ?? "")] ?? "",
       "5013001001002008": [],"5013001001002009": roleLabels[String(row.role ?? "")] ?? String(row.role ?? ""),"5013001001002010": [],
     }
-    await upsertSystemDigitalLibraryRecord({recordId:`std-person-${row.id}`,libraryId:"lib-standard-person",ownerId:row.id,digitalId:"5013001001002001",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-person-${row.id}`,libraryId:"lib-standard-person",ownerId:row.id,digitalId:"5013001001002001",identifierValues:values,
       data:{人员数字化编码:row.employee_code,人员姓名:row.display_name,人员账号:row.username,所属部门:row.department,人员角色:row.role,人员状态:row.status,组织职级:values["5013001001002007"],身份说明:values["5013001001002009"]},createdAt:row.created_at,source:"system_user_sync"})
   }
 
   const departments = await query<any>(`SELECT d.id,d.name,d.status,d.created_at,p.name AS parent_name FROM departments d LEFT JOIN departments p ON p.id=d.parent_id ORDER BY d.created_at`)
   for (const row of departments.rows) {
     const values={"5013001001003001":row.name,"5013001001003002":row.parent_name ?? "","5013001001003003":row.status === "active" ? "启用" : "停用"}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-dept-${row.id}`,libraryId:"lib-standard-dept",digitalId:"5013001001003001",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-dept-${row.id}`,libraryId:"lib-standard-dept",digitalId:"5013001001003001",identifierValues:values,
       data:{部门名称:row.name,上级部门:row.parent_name ?? "",部门状态:row.status},createdAt:row.created_at,source:"system_department_sync"})
   }
 
@@ -278,7 +289,7 @@ export async function syncSystemStandardLibraryRecords() {
   for (const row of models.rows) {
     const config=isRecord(row.configuration) ? row.configuration : {}
     const values={"5013001001005001":row.name,"5013001001005002":row.category,"5013001001005003":String(config.modelCode ?? ""),"5013001001005004":row.project_status === "published" ? "已发布" : row.project_status || (row.can_start ? "可用" : "建设中")}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-model-${row.id}`,libraryId:"lib-standard-model",digitalId:"5013001001005001",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-model-${row.id}`,libraryId:"lib-standard-model",digitalId:"5013001001005001",identifierValues:values,
       data:{模型名称:row.name,模型类别:row.category,模型数字化编码:String(config.modelCode ?? ""),模型状态:values["5013001001005004"]},createdAt:row.created_at,source:"system_model_sync"})
   }
 
@@ -286,21 +297,21 @@ export async function syncSystemStandardLibraryRecords() {
   for (const row of business.rows) {
     const parent=row.parent_id ? business.rows.find((x:any)=>x.id===row.parent_id)?.name ?? "" : ""
     const values={"5013001001006001":row.code,"5013001001006002":row.name,"5013001001006003":parent,"5013001001006004":row.level_no,"5013001001006005":row.description}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-biz-${row.id}`,libraryId:"lib-standard-business-definition",digitalId:"5013001001006002",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-biz-${row.id}`,libraryId:"lib-standard-business-definition",digitalId:"5013001001006002",identifierValues:values,
       data:{业务编码:row.code,业务名称:row.name,上级业务:parent,业务层级:row.level_no,业务定义:row.description},createdAt:row.created_at,source:"system_business_definition_sync"})
   }
 
   const definitions = await query<any>(`SELECT id,code,name,definition_type,definition_text,created_at FROM digital_definitions WHERE status='active' ORDER BY code`)
   for (const row of definitions.rows) {
     const values={"5013001001007001":row.code,"5013001001007002":row.name,"5013001001007003":row.definition_type,"5013001001007004":row.definition_text}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-def-${row.id}`,libraryId:"lib-standard-digital-definition",digitalId:"5013001001007002",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-def-${row.id}`,libraryId:"lib-standard-digital-definition",digitalId:"5013001001007002",identifierValues:values,
       data:{定义编码:row.code,定义名称:row.name,定义类型:row.definition_type,定义内容:row.definition_text},createdAt:row.created_at,source:"system_digital_definition_sync"})
   }
 
   const identifiers = await query<any>(`SELECT id,code,display_name,data_type,description,created_at FROM digital_identifiers WHERE status='active' ORDER BY code`)
   for (const row of identifiers.rows) {
     const values={"5013001001008001":row.code,"5013001001008002":row.display_name,"5013001001008003":row.data_type,"5013001001008004":row.description}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-did-${row.id}`,libraryId:"lib-standard-identifier",digitalId:"5013001001008001",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-did-${row.id}`,libraryId:"lib-standard-identifier",digitalId:"5013001001008001",identifierValues:values,
       data:{数字化标识:row.code,中文名称:row.display_name,数据类型:row.data_type,标识说明:row.description},createdAt:row.created_at,source:"system_identifier_sync"})
   }
 
@@ -308,7 +319,7 @@ export async function syncSystemStandardLibraryRecords() {
   for (const row of libraries.rows) {
     if(row.id==='lib-standard-library-catalog') continue
     const values={"5013001001009001":row.name,"5013001001009002":'数字化库',"5013001001009003":row.is_standard ? '是' : '否',"5013001001009004":row.allow_as_source ? '是' : '否'}
-    await upsertSystemDigitalLibraryRecord({recordId:`std-lib-${row.id}`,libraryId:"lib-standard-library-catalog",digitalId:"5013001001009001",identifierValues:values,
+    await runModelBackedDigitalLibraryRecord({recordId:`std-lib-${row.id}`,libraryId:"lib-standard-library-catalog",digitalId:"5013001001009001",identifierValues:values,
       data:{数字化库名称:row.name,数字化库类型:values["5013001001009002"],数字化库功能:values["5013001001009003"],允许作为数据源:values["5013001001009004"]},createdAt:row.created_at,source:"system_library_catalog_sync"})
   }
   await materializeLegacyDigitalLibraryRuns()
@@ -474,7 +485,7 @@ async function repairLegacyLibraryIdentifierValues(userId: string, libraryId: st
     }
     if (changed) {
       // V17.7.14：历史数据修复同样必须形成新的 system_sync 模型运行，禁止列表读取过程直接改正式数字化库或篡改原 model_runs。
-      await upsertSystemDigitalLibraryRecord({recordId:String(row.id),libraryId,ownerId:row.owner_id ? String(row.owner_id) : null,digitalId:String(row.digital_id ?? ""),identifierValues:current,data,source:"legacy_identifier_repair"})
+      await runModelBackedDigitalLibraryRecord({recordId:String(row.id),libraryId,ownerId:row.owner_id ? String(row.owner_id) : null,digitalId:String(row.digital_id ?? ""),identifierValues:current,data,source:"legacy_identifier_repair"})
     }
   }
 }
